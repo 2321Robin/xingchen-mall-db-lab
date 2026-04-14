@@ -1,1 +1,7 @@
 .worktrees/
+server/.git/
+nuxt-app/.git/
+server/.idea/
+nuxt-app/.nuxt/
+nuxt-app/.output/
+*.zip
