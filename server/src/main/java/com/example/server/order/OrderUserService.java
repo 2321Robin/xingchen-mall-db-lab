@@ -130,6 +130,7 @@ public class OrderUserService {
             orderItem.setOrder(order);
             orderItem.setProductName(product.getName());
             orderItem.setProductSku(product.getSku());
+            orderItem.setProductId(product.getId());
             orderItem.setQuantity(quantity);
             orderItem.setUnitPrice(product.getPrice());
             order.getItems().add(orderItem);

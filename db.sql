@@ -61,6 +61,7 @@ CREATE TABLE public.order_items (
     id bigint NOT NULL,
     product_name character varying(120) NOT NULL,
     product_sku character varying(64),
+    product_id bigint NOT NULL,
     quantity integer NOT NULL,
     unit_price numeric(10,2) NOT NULL,
     order_id bigint NOT NULL
@@ -239,12 +240,12 @@ COPY public.cart_items (id, created_at, quantity, updated_at, user_id, product_i
 -- Data for Name: order_items; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.order_items (id, product_name, product_sku, quantity, unit_price, order_id) FROM stdin;
-1	星辰蓝牙耳机	SC-AIR-01	1	299.00	1
-2	极光智能手表	SC-WATCH-01	1	699.00	2
-3	轻羽保温杯	SC-CUP-01	1	289.00	2
-4	极光智能手表	SC-WATCH-01	4	699.00	77
-5	星辰蓝牙耳机	SC-AIR-01	2	299.00	77
+COPY public.order_items (id, product_name, product_sku, product_id, quantity, unit_price, order_id) FROM stdin;
+1	星辰蓝牙耳机	SC-AIR-01	1	1	299.00	1
+2	极光智能手表	SC-WATCH-01	2	1	699.00	2
+3	轻羽保温杯	SC-CUP-01	3	1	289.00	2
+4	极光智能手表	SC-WATCH-01	2	4	699.00	77
+5	星辰蓝牙耳机	SC-AIR-01	1	2	299.00	77
 \.
 
 
@@ -455,6 +456,14 @@ CREATE INDEX idx_user_addresses_user ON public.user_addresses USING btree (user_
 
 ALTER TABLE ONLY public.cart_items
     ADD CONSTRAINT fk1re40cjegsfvw58xrkdp6bac6 FOREIGN KEY (product_id) REFERENCES public.products(id);
+
+
+--
+-- Name: order_items fk_order_items_product; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.order_items
+    ADD CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES public.products(id);
 
 
 --

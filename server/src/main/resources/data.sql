@@ -74,25 +74,28 @@ WHERE ua.username = 'user01'
 ON CONFLICT (order_number)
 DO NOTHING;
 
-INSERT INTO order_items (order_id, product_name, product_sku, quantity, unit_price)
-SELECT o.id, '星辰蓝牙耳机', 'SC-AIR-01', 1, 299.00
+INSERT INTO order_items (order_id, product_name, product_sku, product_id, quantity, unit_price)
+SELECT o.id, p.name, p.sku, p.id, 1, 299.00
 FROM orders o
+JOIN products p ON p.sku = 'SC-AIR-01'
 WHERE o.order_number = 'ORD-202511-0001'
     AND NOT EXISTS (
         SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.product_sku = 'SC-AIR-01'
     );
 
-INSERT INTO order_items (order_id, product_name, product_sku, quantity, unit_price)
-SELECT o.id, '极光智能手表', 'SC-WATCH-01', 1, 699.00
+INSERT INTO order_items (order_id, product_name, product_sku, product_id, quantity, unit_price)
+SELECT o.id, p.name, p.sku, p.id, 1, 699.00
 FROM orders o
+JOIN products p ON p.sku = 'SC-WATCH-01'
 WHERE o.order_number = 'ORD-202511-0002'
     AND NOT EXISTS (
         SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.product_sku = 'SC-WATCH-01'
     );
 
-INSERT INTO order_items (order_id, product_name, product_sku, quantity, unit_price)
-SELECT o.id, '轻羽保温杯', 'SC-CUP-01', 1, 289.00
+INSERT INTO order_items (order_id, product_name, product_sku, product_id, quantity, unit_price)
+SELECT o.id, p.name, p.sku, p.id, 1, 289.00
 FROM orders o
+JOIN products p ON p.sku = 'SC-CUP-01'
 WHERE o.order_number = 'ORD-202511-0002'
     AND NOT EXISTS (
         SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.product_sku = 'SC-CUP-01'

@@ -30,6 +30,9 @@ public class OrderItem {
     @Column(name = "product_sku", length = 64)
     private String productSku;
 
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
     @Column(nullable = false)
     private Integer quantity;
 
@@ -62,6 +65,14 @@ public class OrderItem {
 
     public void setProductSku(String productSku) {
         this.productSku = productSku;
+    }
+
+    public Long getProductId() {
+        return productId;
+    }
+
+    public void setProductId(Long productId) {
+        this.productId = productId;
     }
 
     public Integer getQuantity() {
