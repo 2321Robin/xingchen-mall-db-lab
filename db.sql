@@ -190,6 +190,67 @@ ALTER FUNCTION public.validate_review_consistency() OWNER TO postgres;
 
 
 --
+-- Name: prevent_review_breakage_from_order_item_update(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.prevent_review_breakage_from_order_item_update() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.product_id IS DISTINCT FROM OLD.product_id AND EXISTS (
+        SELECT 1
+        FROM public.reviews r
+        WHERE r.order_item_id = OLD.id
+            AND r.product_id IS DISTINCT FROM NEW.product_id
+    ) THEN
+        RAISE EXCEPTION 'cannot update order_items.product_id for order item % because dependent reviews exist', OLD.id;
+    END IF;
+
+    IF NEW.order_id IS DISTINCT FROM OLD.order_id AND EXISTS (
+        SELECT 1
+        FROM public.reviews r
+        JOIN public.orders o ON o.id = NEW.order_id
+        WHERE r.order_item_id = OLD.id
+            AND r.user_id IS DISTINCT FROM o.user_id
+    ) THEN
+        RAISE EXCEPTION 'cannot update order_items.order_id for order item % because dependent reviews exist', OLD.id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.prevent_review_breakage_from_order_item_update() OWNER TO postgres;
+
+
+--
+-- Name: prevent_review_breakage_from_order_update(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.prevent_review_breakage_from_order_update() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM public.order_items oi
+        JOIN public.reviews r ON r.order_item_id = oi.id
+        WHERE oi.order_id = OLD.id
+            AND r.user_id IS DISTINCT FROM NEW.user_id
+    ) THEN
+        RAISE EXCEPTION 'cannot update orders.user_id for order % because dependent reviews exist', OLD.id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.prevent_review_breakage_from_order_update() OWNER TO postgres;
+
+
+--
 -- Name: orders; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -695,6 +756,20 @@ ALTER TABLE ONLY public.reviews
 --
 
 CREATE TRIGGER trg_reviews_validate_consistency BEFORE INSERT OR UPDATE ON public.reviews FOR EACH ROW EXECUTE FUNCTION public.validate_review_consistency();
+
+
+--
+-- Name: order_items trg_order_items_protect_review_consistency; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_order_items_protect_review_consistency BEFORE UPDATE OF product_id, order_id ON public.order_items FOR EACH ROW EXECUTE FUNCTION public.prevent_review_breakage_from_order_item_update();
+
+
+--
+-- Name: orders trg_orders_protect_review_consistency; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_orders_protect_review_consistency BEFORE UPDATE OF user_id ON public.orders FOR EACH ROW EXECUTE FUNCTION public.prevent_review_breakage_from_order_update();
 
 
 --
