@@ -14,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.server.cart.CartItem;
 import com.example.server.cart.CartItemRepository;
 import com.example.server.order.dto.CreateOrderRequest;
+import com.example.server.order.dto.OrderResponse;
+import com.example.server.payment.PaymentRecord;
+import com.example.server.payment.PaymentRecordRepository;
+import com.example.server.payment.PaymentStatus;
 import com.example.server.product.Product;
 import com.example.server.product.ProductRepository;
 import com.example.server.product.ProductStatus;
@@ -59,6 +63,9 @@ class OrderPaymentFlowTests {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PaymentRecordRepository paymentRecordRepository;
 
     @Test
     void createOrderPersistsProductIdWithoutBreakingLegacyOrderItems() {
@@ -122,5 +129,54 @@ class OrderPaymentFlowTests {
                 savedOrder.getId()
         );
         assertThat(savedProductId).isEqualTo(productId);
+    }
+
+    @Test
+    void markAsPaidCreatesSuccessfulPaymentRecord() {
+        UserAccount user = new UserAccount();
+        user.setUsername("buyer02");
+        user.setPasswordHash("{noop}secret");
+        user.setEmail("buyer02@example.com");
+        user.setPhone("13900000002");
+        user.setRole(UserRole.CUSTOMER);
+        user.setActive(true);
+        user = userAccountRepository.save(user);
+
+        UserAddress address = new UserAddress();
+        address.setUser(user);
+        address.setRecipientName("李四");
+        address.setPhone("13900000002");
+        address.setProvince("广东省");
+        address.setCity("深圳市");
+        address.setDistrict("南山区");
+        address.setStreet("科技园 1 号");
+        address.setPostalCode("518000");
+        address.setDefault(true);
+        address = userAddressRepository.save(address);
+
+        Product product = new Product();
+        product.setName("星河充电器");
+        product.setSku("SC-CHARGE-01");
+        product.setCategory("数码配件");
+        product.setPrice(new BigDecimal("99.00"));
+        product.setStock(10);
+        product.setStatus(ProductStatus.ACTIVE);
+        product = productRepository.save(product);
+
+        CartItem cartItem = new CartItem();
+        cartItem.setUserId(user.getId());
+        cartItem.setProduct(product);
+        cartItem.setQuantity(1);
+        cartItemRepository.save(cartItem);
+
+        OrderResponse created = orderUserService.createOrder(user.getId(), new CreateOrderRequest(address.getId()));
+        OrderResponse paid = orderUserService.markAsPaid(user.getId(), created.id());
+
+        PaymentRecord record = paymentRecordRepository.findTopByOrderIdOrderByCreatedAtDesc(created.id()).orElseThrow();
+
+        assertThat(paid.status()).isEqualTo(OrderStatus.PAID);
+        assertThat(record.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(record.getAmount()).isPositive();
+        assertThat(record.getPaidAt()).isNotNull();
     }
 }

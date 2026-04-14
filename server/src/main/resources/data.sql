@@ -100,3 +100,19 @@ WHERE o.order_number = 'ORD-202511-0002'
     AND NOT EXISTS (
         SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.product_sku = 'SC-CUP-01'
     );
+
+INSERT INTO payment_records (order_id, payment_no, payment_method, amount, payment_status, paid_at, created_at, updated_at)
+SELECT o.id, 'PAY-ORD-202511-0001', 'ALIPAY', o.total_amount, 'SUCCESS', NOW(), NOW(), NOW()
+FROM orders o
+WHERE o.order_number = 'ORD-202511-0001'
+    AND NOT EXISTS (
+        SELECT 1 FROM payment_records pr WHERE pr.payment_no = 'PAY-ORD-202511-0001'
+    );
+
+INSERT INTO payment_records (order_id, payment_no, payment_method, amount, payment_status, paid_at, created_at, updated_at)
+SELECT o.id, 'PAY-ORD-202511-0002', 'ALIPAY', o.total_amount, 'SUCCESS', NOW(), NOW(), NOW()
+FROM orders o
+WHERE o.order_number = 'ORD-202511-0002'
+    AND NOT EXISTS (
+        SELECT 1 FROM payment_records pr WHERE pr.payment_no = 'PAY-ORD-202511-0002'
+    );

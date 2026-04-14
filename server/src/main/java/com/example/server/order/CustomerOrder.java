@@ -8,6 +8,7 @@ import java.util.List;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.example.server.payment.PaymentRecord;
 import com.example.server.user.UserAccount;
 
 import jakarta.persistence.CascadeType;
@@ -82,6 +83,10 @@ public class CustomerOrder {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
     private List<OrderItem> items = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC")
+    private List<PaymentRecord> paymentRecords = new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -197,5 +202,13 @@ public class CustomerOrder {
 
     public void setItems(List<OrderItem> items) {
         this.items = items;
+    }
+
+    public List<PaymentRecord> getPaymentRecords() {
+        return paymentRecords;
+    }
+
+    public void setPaymentRecords(List<PaymentRecord> paymentRecords) {
+        this.paymentRecords = paymentRecords;
     }
 }

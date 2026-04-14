@@ -2,6 +2,7 @@ package com.example.server.order;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -17,6 +18,9 @@ import com.example.server.cart.dto.CartSummaryResponse;
 import com.example.server.order.dto.CheckoutSummaryResponse;
 import com.example.server.order.dto.CreateOrderRequest;
 import com.example.server.order.dto.OrderResponse;
+import com.example.server.payment.PaymentMethod;
+import com.example.server.payment.PaymentRecord;
+import com.example.server.payment.PaymentStatus;
 import com.example.server.product.Product;
 import com.example.server.product.ProductStatus;
 import com.example.server.user.UserAccount;
@@ -162,7 +166,16 @@ public class OrderUserService {
             throw new OrderException("当前订单状态不支持支付更新");
         }
 
+        PaymentRecord paymentRecord = new PaymentRecord();
+        paymentRecord.setOrder(order);
+        paymentRecord.setPaymentNo("PAY-" + order.getOrderNumber());
+        paymentRecord.setPaymentMethod(PaymentMethod.ALIPAY);
+        paymentRecord.setAmount(order.getTotalAmount());
+        paymentRecord.setPaymentStatus(PaymentStatus.SUCCESS);
+        paymentRecord.setPaidAt(Instant.now());
+        order.getPaymentRecords().add(paymentRecord);
         order.setStatus(OrderStatus.PAID);
+
         return OrderMapper.toResponse(order);
     }
 
