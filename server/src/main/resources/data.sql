@@ -116,3 +116,29 @@ WHERE o.order_number = 'ORD-202511-0002'
     AND NOT EXISTS (
         SELECT 1 FROM payment_records pr WHERE pr.payment_no = 'PAY-ORD-202511-0002'
     );
+
+INSERT INTO reviews (user_id, product_id, order_item_id, rating, content, created_at, updated_at)
+SELECT ua.id, p.id, oi.id, 5, '极光手表续航稳定，日常佩戴很方便', NOW(), NOW()
+FROM user_accounts ua
+JOIN orders o ON o.user_id = ua.id
+JOIN order_items oi ON oi.order_id = o.id
+JOIN products p ON p.id = oi.product_id
+WHERE ua.username = 'user01'
+    AND o.order_number = 'ORD-202511-0002'
+    AND oi.product_sku = 'SC-WATCH-01'
+    AND NOT EXISTS (
+        SELECT 1 FROM reviews r WHERE r.order_item_id = oi.id
+    );
+
+INSERT INTO reviews (user_id, product_id, order_item_id, rating, content, created_at, updated_at)
+SELECT ua.id, p.id, oi.id, 4, '保温效果不错，杯身轻巧', NOW(), NOW()
+FROM user_accounts ua
+JOIN orders o ON o.user_id = ua.id
+JOIN order_items oi ON oi.order_id = o.id
+JOIN products p ON p.id = oi.product_id
+WHERE ua.username = 'user01'
+    AND o.order_number = 'ORD-202511-0002'
+    AND oi.product_sku = 'SC-CUP-01'
+    AND NOT EXISTS (
+        SELECT 1 FROM reviews r WHERE r.order_item_id = oi.id
+    );
