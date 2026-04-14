@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,9 +29,12 @@ import com.example.server.user.address.UserAddressRepository;
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.jpa.hibernate.ddl-auto=update",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-        "spring.sql.init.mode=never"
+        "spring.jpa.defer-datasource-initialization=false",
+        "spring.sql.init.mode=always",
+        "spring.sql.init.schema-locations=classpath:order/order-payment-flow-legacy-schema.sql",
+        "spring.sql.init.data-locations=classpath:order/order-payment-flow-legacy-data.sql"
 })
 @Transactional
 class OrderPaymentFlowTests {
@@ -53,8 +57,17 @@ class OrderPaymentFlowTests {
     @Autowired
     private CartItemRepository cartItemRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Test
-    void createOrderPersistsProductIdOnOrderItems() {
+    void createOrderPersistsProductIdWithoutBreakingLegacyOrderItems() {
+        Long legacyProductId = jdbcTemplate.queryForObject(
+                "select product_id from order_items where id = 10",
+                Long.class
+        );
+        assertThat(legacyProductId).isNull();
+
         UserAccount user = new UserAccount();
         user.setUsername("buyer01");
         user.setPasswordHash("{noop}secret");
@@ -102,5 +115,12 @@ class OrderPaymentFlowTests {
             assertThat(item.getProductSku()).isEqualTo(productSku);
             assertThat(item.getProductId()).isEqualTo(productId);
         });
+
+        Long savedProductId = jdbcTemplate.queryForObject(
+                "select product_id from order_items where order_id = ?",
+                Long.class,
+                savedOrder.getId()
+        );
+        assertThat(savedProductId).isEqualTo(productId);
     }
 }

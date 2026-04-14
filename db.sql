@@ -61,7 +61,7 @@ CREATE TABLE public.order_items (
     id bigint NOT NULL,
     product_name character varying(120) NOT NULL,
     product_sku character varying(64),
-    product_id bigint NOT NULL,
+    product_id bigint,
     quantity integer NOT NULL,
     unit_price numeric(10,2) NOT NULL,
     order_id bigint NOT NULL
@@ -458,15 +458,6 @@ ALTER TABLE ONLY public.cart_items
     ADD CONSTRAINT fk1re40cjegsfvw58xrkdp6bac6 FOREIGN KEY (product_id) REFERENCES public.products(id);
 
 
---
--- Name: order_items fk_order_items_product; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.order_items
-    ADD CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES public.products(id);
-
-
---
 -- Name: order_items fkbioxgbv59vetrxe0ejfubep1w; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 

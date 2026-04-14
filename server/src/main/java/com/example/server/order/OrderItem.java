@@ -30,7 +30,7 @@ public class OrderItem {
     @Column(name = "product_sku", length = 64)
     private String productSku;
 
-    @Column(name = "product_id", nullable = false)
+    @Column(name = "product_id")
     private Long productId;
 
     @Column(nullable = false)
