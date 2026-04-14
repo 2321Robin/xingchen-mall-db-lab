@@ -142,3 +142,40 @@ WHERE ua.username = 'user01'
     AND NOT EXISTS (
         SELECT 1 FROM reviews r WHERE r.order_item_id = oi.id
     );
+
+CREATE OR REPLACE FUNCTION public.validate_review_consistency()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    expected_user_id BIGINT;
+    expected_product_id BIGINT;
+BEGIN
+    SELECT o.user_id, oi.product_id
+    INTO expected_user_id, expected_product_id
+    FROM public.order_items oi
+    JOIN public.orders o ON o.id = oi.order_id
+    WHERE oi.id = NEW.order_item_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'review order_item_id % does not reference an existing order item', NEW.order_item_id;
+    END IF;
+
+    IF NEW.user_id IS DISTINCT FROM expected_user_id THEN
+        RAISE EXCEPTION 'review user_id % must match order item purchaser %', NEW.user_id, expected_user_id;
+    END IF;
+
+    IF NEW.product_id IS DISTINCT FROM expected_product_id THEN
+        RAISE EXCEPTION 'review product_id % must match order item product %', NEW.product_id, expected_product_id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_reviews_validate_consistency ON public.reviews;
+
+CREATE TRIGGER trg_reviews_validate_consistency
+    BEFORE INSERT OR UPDATE ON public.reviews
+    FOR EACH ROW
+    EXECUTE FUNCTION public.validate_review_consistency();
