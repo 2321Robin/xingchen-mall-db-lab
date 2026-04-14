@@ -155,7 +155,7 @@ public class OrderUserService {
     @Transactional
     public OrderResponse markAsPaid(Long userId, Long orderId) {
         requireUser(userId);
-        CustomerOrder order = customerOrderRepository.findByIdAndUserId(orderId, userId)
+        CustomerOrder order = customerOrderRepository.findByIdAndUserIdForUpdate(orderId, userId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
         if (order.getStatus() == OrderStatus.PAID) {

@@ -3,11 +3,13 @@ package com.example.server.order;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.lang.reflect.Method;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,8 @@ import com.example.server.user.UserAccountRepository;
 import com.example.server.user.UserRole;
 import com.example.server.user.address.UserAddress;
 import com.example.server.user.address.UserAddressRepository;
+
+import jakarta.persistence.LockModeType;
 
 @SpringBootTest
 @TestPropertySource(properties = {
@@ -178,5 +182,19 @@ class OrderPaymentFlowTests {
         assertThat(record.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(record.getAmount()).isPositive();
         assertThat(record.getPaidAt()).isNotNull();
+    }
+
+    @Test
+    void paymentUpdateLookupUsesPessimisticWriteLock() throws NoSuchMethodException {
+        Method method = CustomerOrderRepository.class.getMethod(
+                "findByIdAndUserIdForUpdate",
+                Long.class,
+                Long.class
+        );
+
+        Lock lock = method.getAnnotation(Lock.class);
+
+        assertThat(lock).isNotNull();
+        assertThat(lock.value()).isEqualTo(LockModeType.PESSIMISTIC_WRITE);
     }
 }
