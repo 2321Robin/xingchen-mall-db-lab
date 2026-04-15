@@ -148,6 +148,46 @@ class CustomerConsumptionReportRepositoryTests {
     }
 
     @Test
+    void complexReportAndViewPreferSuccessfulPaymentWhenLaterPendingPaymentHasNullPaidAt() {
+        UserAccount user = createUser("report-user-null-paid-at", "report-user-null-paid-at@example.com", "13900000033");
+        Product product = createProduct("REPORT-NULL-PAID-AT", "测试分类", new BigDecimal("120.00"));
+
+        CustomerOrder order = createOrder(user, "ORD-REPORT-NULL-PAID-AT", OrderStatus.PAID, new BigDecimal("120.00"));
+        OrderItem orderItem = createOrderItem(order, product, 1, new BigDecimal("120.00"));
+        createPayment(order, "PAY-REPORT-NULL-PAID-AT-SUCCESS", new BigDecimal("120.00"), PaymentStatus.SUCCESS,
+                Instant.parse("2026-04-18T09:15:00Z"));
+        createPayment(order, "PAY-REPORT-NULL-PAID-AT-PENDING", new BigDecimal("120.00"), PaymentStatus.PENDING, null);
+
+        entityManager.flush();
+        recreateOrderDetailView();
+        entityManager.clear();
+
+        List<CustomerConsumptionReportRow> rows = reportRepository.fetchCustomerConsumptionReport();
+        Object[] viewRow = (Object[]) entityManager.getEntityManager()
+                .createNativeQuery("""
+                        SELECT payment_status, paid_at
+                        FROM order_detail_view
+                        WHERE order_item_id = :orderItemId
+                        """)
+                .setParameter("orderItemId", orderItem.getId())
+                .getSingleResult();
+
+        assertThat(rows)
+                .filteredOn(row -> row.userId().equals(user.getId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.orderCount()).isEqualTo(1L);
+                    assertThat(row.totalItems()).isEqualTo(1L);
+                    assertThat(row.totalPaidAmount()).isEqualByComparingTo("120.00");
+                    assertThat(row.lastPaidAt()).isEqualTo(Instant.parse("2026-04-18T09:15:00Z"));
+                    assertThat(row.favoriteCategory()).isEqualTo("测试分类");
+                    assertThat(row.categoryBuyCount()).isEqualTo(1L);
+                });
+        assertThat(viewRow[0]).isEqualTo("SUCCESS");
+        assertThat(toInstant(viewRow[1])).isEqualTo(Instant.parse("2026-04-18T09:15:00Z"));
+    }
+
+    @Test
     void reviewPersistsWhenReferencesMatchOrderItem() {
         ReviewFixture fixture = createFixture();
         Review review = createReview(fixture);
@@ -252,12 +292,17 @@ class CustomerConsumptionReportRepositoryTests {
     }
 
     private PaymentRecord createPayment(CustomerOrder order, String paymentNo, BigDecimal amount, Instant paidAt) {
+        return createPayment(order, paymentNo, amount, PaymentStatus.SUCCESS, paidAt);
+    }
+
+    private PaymentRecord createPayment(CustomerOrder order, String paymentNo, BigDecimal amount, PaymentStatus paymentStatus,
+            Instant paidAt) {
         PaymentRecord paymentRecord = new PaymentRecord();
         paymentRecord.setOrder(order);
         paymentRecord.setPaymentNo(paymentNo);
         paymentRecord.setPaymentMethod(PaymentMethod.ALIPAY);
         paymentRecord.setAmount(amount);
-        paymentRecord.setPaymentStatus(PaymentStatus.SUCCESS);
+        paymentRecord.setPaymentStatus(paymentStatus);
         paymentRecord.setPaidAt(paidAt);
         entityManager.persist(paymentRecord);
         return paymentRecord;
@@ -297,7 +342,7 @@ class CustomerConsumptionReportRepositoryTests {
                             pr.paid_at,
                             ROW_NUMBER() OVER (
                                 PARTITION BY pr.order_id
-                                ORDER BY pr.paid_at DESC, pr.id DESC
+                                ORDER BY pr.paid_at DESC NULLS LAST, pr.id DESC
                             ) AS payment_rank
                         FROM payment_records pr
                     ) ranked_payments
