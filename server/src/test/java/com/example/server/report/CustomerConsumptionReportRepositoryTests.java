@@ -140,6 +140,26 @@ class CustomerConsumptionReportRepositoryTests {
     }
 
     @Test
+    void complexReportExcludesAdminUsers() {
+        UserAccount customer = createUser("report-user-customer-only", "report-user-customer-only@example.com", "13900000038");
+        UserAccount admin = createUser("report-user-admin", "report-user-admin@example.com", "13900000039", UserRole.ADMIN);
+        Product product = createProduct("REPORT-ADMIN-EXCLUDE", "测试分类", new BigDecimal("88.00"));
+
+        CustomerOrder adminOrder = createOrder(admin, "ORD-REPORT-ADMIN", OrderStatus.PAID, new BigDecimal("88.00"));
+        createOrderItem(adminOrder, product, 1, new BigDecimal("88.00"));
+        createPayment(adminOrder, "PAY-REPORT-ADMIN", new BigDecimal("88.00"), Instant.parse("2026-04-18T11:00:00Z"));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<CustomerConsumptionReportRow> rows = reportRepository.fetchCustomerConsumptionReport();
+
+        assertThat(rows)
+                .extracting(CustomerConsumptionReportRow::userId)
+                .containsExactly(customer.getId());
+    }
+
+    @Test
     void complexReportBreaksEqualPaymentTiesByOrderCountBeforeUserId() {
         UserAccount multiOrderUser = createUser("report-user-tie-many", "report-user-tie-many@example.com", "13900000036");
         UserAccount singleOrderUser = createUser("report-user-tie-one", "report-user-tie-one@example.com", "13900000037");
@@ -414,12 +434,16 @@ class CustomerConsumptionReportRepositoryTests {
     }
 
     private UserAccount createUser(String username, String email, String phone) {
+        return createUser(username, email, phone, UserRole.CUSTOMER);
+    }
+
+    private UserAccount createUser(String username, String email, String phone, UserRole role) {
         UserAccount user = new UserAccount();
         user.setUsername(username);
         user.setPasswordHash("{noop}secret");
         user.setEmail(email);
         user.setPhone(phone);
-        user.setRole(UserRole.CUSTOMER);
+        user.setRole(role);
         user.setActive(true);
         entityManager.persist(user);
         return user;

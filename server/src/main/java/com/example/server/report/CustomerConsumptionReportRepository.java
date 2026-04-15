@@ -61,6 +61,7 @@ public class CustomerConsumptionReportRepository {
                 ) ranked_categories
                 WHERE category_rank = 1
             ) favorite ON favorite.user_id = u.id
+            WHERE u.role = 'CUSTOMER'
             GROUP BY
                 u.id,
                 u.username,
