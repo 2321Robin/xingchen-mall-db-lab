@@ -108,6 +108,68 @@ class CustomerConsumptionReportRepositoryTests {
     }
 
     @Test
+    void complexReportIncludesUsersWithoutOrdersWithZeroAggregates() {
+        UserAccount activeUser = createUser("report-user-active", "report-user-active@example.com", "13900000034");
+        UserAccount idleUser = createUser("report-user-idle", "report-user-idle@example.com", "13900000035");
+        Product product = createProduct("REPORT-IDLE-USER", "测试分类", new BigDecimal("48.00"));
+
+        CustomerOrder order = createOrder(activeUser, "ORD-REPORT-IDLE-USER", OrderStatus.PAID, new BigDecimal("96.00"));
+        createOrderItem(order, product, 2, new BigDecimal("48.00"));
+        createPayment(order, "PAY-REPORT-IDLE-USER", new BigDecimal("96.00"), Instant.parse("2026-04-18T10:00:00Z"));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<CustomerConsumptionReportRow> rows = reportRepository.fetchCustomerConsumptionReport();
+
+        assertThat(rows)
+                .extracting(CustomerConsumptionReportRow::userId)
+                .contains(activeUser.getId(), idleUser.getId());
+        assertThat(rows)
+                .filteredOn(row -> row.userId().equals(idleUser.getId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.username()).isEqualTo("report-user-idle");
+                    assertThat(row.orderCount()).isEqualTo(0L);
+                    assertThat(row.totalItems()).isEqualTo(0L);
+                    assertThat(row.totalPaidAmount()).isEqualByComparingTo("0");
+                    assertThat(row.lastPaidAt()).isNull();
+                    assertThat(row.favoriteCategory()).isNull();
+                    assertThat(row.categoryBuyCount()).isNull();
+                });
+    }
+
+    @Test
+    void complexReportBreaksEqualPaymentTiesByOrderCountBeforeUserId() {
+        UserAccount multiOrderUser = createUser("report-user-tie-many", "report-user-tie-many@example.com", "13900000036");
+        UserAccount singleOrderUser = createUser("report-user-tie-one", "report-user-tie-one@example.com", "13900000037");
+        Product product = createProduct("REPORT-TIE-BREAK", "测试分类", new BigDecimal("50.00"));
+
+        CustomerOrder firstOrder = createOrder(multiOrderUser, "ORD-REPORT-TIE-1", OrderStatus.PAID, new BigDecimal("40.00"));
+        createOrderItem(firstOrder, product, 1, new BigDecimal("40.00"));
+        createPayment(firstOrder, "PAY-REPORT-TIE-1", new BigDecimal("40.00"), Instant.parse("2026-04-18T08:00:00Z"));
+
+        CustomerOrder secondOrder = createOrder(multiOrderUser, "ORD-REPORT-TIE-2", OrderStatus.PAID, new BigDecimal("60.00"));
+        createOrderItem(secondOrder, product, 1, new BigDecimal("60.00"));
+        createPayment(secondOrder, "PAY-REPORT-TIE-2", new BigDecimal("60.00"), Instant.parse("2026-04-18T09:00:00Z"));
+
+        CustomerOrder singleOrder = createOrder(singleOrderUser, "ORD-REPORT-TIE-3", OrderStatus.PAID, new BigDecimal("100.00"));
+        createOrderItem(singleOrder, product, 2, new BigDecimal("50.00"));
+        createPayment(singleOrder, "PAY-REPORT-TIE-3", new BigDecimal("100.00"), Instant.parse("2026-04-18T10:00:00Z"));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<CustomerConsumptionReportRow> rows = reportRepository.fetchCustomerConsumptionReport();
+
+        assertThat(rows.subList(0, 2))
+                .extracting(CustomerConsumptionReportRow::userId)
+                .containsExactly(multiOrderUser.getId(), singleOrderUser.getId());
+        assertThat(rows.get(0).totalPaidAmount()).isEqualByComparingTo(rows.get(1).totalPaidAmount());
+        assertThat(rows.get(0).orderCount()).isGreaterThan(rows.get(1).orderCount());
+    }
+
+    @Test
     void complexReportAndViewDoNotMultiplyOrderItemsAcrossMultiplePayments() {
         UserAccount user = createUser("report-user-multi-payment", "report-user-multi-payment@example.com", "13900000032");
         Product product = createProduct("REPORT-MULTI-PAY", "测试分类", new BigDecimal("50.00"));

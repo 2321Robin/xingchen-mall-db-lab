@@ -17,15 +17,22 @@ public class CustomerConsumptionReportRepository {
             SELECT
                 u.id AS user_id,
                 u.username,
-                COUNT(DISTINCT o.id) AS order_count,
-                COALESCE(SUM(oi.quantity), 0) AS total_items,
+                COALESCE(order_stats.order_count, 0) AS order_count,
+                COALESCE(order_stats.total_items, 0) AS total_items,
                 COALESCE(pay.total_paid_amount, 0) AS total_paid_amount,
                 pay.last_paid_at,
                 favorite.favorite_category,
                 favorite.category_buy_count
             FROM user_accounts u
-            JOIN orders o ON o.user_id = u.id
-            JOIN order_items oi ON oi.order_id = o.id
+            LEFT JOIN (
+                SELECT
+                    o.user_id,
+                    COUNT(DISTINCT o.id) AS order_count,
+                    COALESCE(SUM(oi.quantity), 0) AS total_items
+                FROM orders o
+                LEFT JOIN order_items oi ON oi.order_id = o.id
+                GROUP BY o.user_id
+            ) order_stats ON order_stats.user_id = u.id
             LEFT JOIN (
                 SELECT
                     o.user_id,
@@ -57,11 +64,13 @@ public class CustomerConsumptionReportRepository {
             GROUP BY
                 u.id,
                 u.username,
+                order_stats.order_count,
+                order_stats.total_items,
                 pay.total_paid_amount,
                 pay.last_paid_at,
                 favorite.favorite_category,
                 favorite.category_buy_count
-            ORDER BY total_paid_amount DESC, u.id ASC
+            ORDER BY total_paid_amount DESC, order_count DESC, u.id ASC
             """;
 
     private final EntityManager entityManager;
