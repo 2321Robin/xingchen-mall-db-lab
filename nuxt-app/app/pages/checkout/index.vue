@@ -283,11 +283,17 @@ onUnmounted(() => {
         description="确认购物车商品、选择收货地址并提交订单。"
         :links="[
           {
+            label: '返回主界面',
+            icon: 'i-lucide-home',
+            to: '/dashboard',
+            color: 'neutral',
+            variant: 'ghost'
+          },
+          {
             label: '返回购物车',
             icon: 'i-lucide-shopping-cart',
             to: '/cart',
-            color: 'neutral',
-            variant: 'ghost'
+            color: 'primary'
           }
         ]"
       />

@@ -356,7 +356,7 @@ function isFetchError(error: unknown): error is FetchError<{ message?: string }>
           {
             label: '返回主界面',
             icon: 'i-lucide-home',
-            to: '/',
+            to: '/dashboard',
             color: 'neutral',
             variant: 'ghost'
           }

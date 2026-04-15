@@ -157,11 +157,17 @@ function isFetchError(error: unknown): error is FetchError {
         description="更新商品的核心信息。"
         :links="[
           {
+            label: '返回主界面',
+            icon: 'i-lucide-home',
+            to: '/dashboard',
+            color: 'neutral',
+            variant: 'ghost'
+          },
+          {
             label: '返回商品列表',
             icon: 'i-lucide-arrow-left',
             to: '/products',
-            color: 'neutral',
-            variant: 'ghost'
+            color: 'primary'
           }
         ]"
       />
@@ -181,30 +187,30 @@ function isFetchError(error: unknown): error is FetchError {
 
       <UForm :state="state" class="space-y-6" @submit="onSubmit">
         <div class="grid gap-4 md:grid-cols-2">
-          <UFormGroup label="商品名称" name="name" required>
+          <UFormField label="商品名称" name="name" required>
             <p class="mb-1 text-xs text-muted">示例：星辰蓝牙耳机；建议 10-20 个字，方便用户识别。</p>
             <UInput v-model="state.name" placeholder="例：星辰蓝牙耳机" />
-          </UFormGroup>
-          <UFormGroup label="商品 SKU" name="sku" required>
+          </UFormField>
+          <UFormField label="商品 SKU" name="sku" required>
             <p class="mb-1 text-xs text-muted">示例：SC-AIR-01；建议遵循品牌-品类-序号的格式。</p>
             <UInput v-model="state.sku" placeholder="例：SC-AIR-01" />
-          </UFormGroup>
-          <UFormGroup label="商品分类" name="category" required class="md:col-span-2">
+          </UFormField>
+          <UFormField label="商品分类" name="category" required class="md:col-span-2">
             <p class="mb-1 text-xs text-muted">示例：数码影音；分类用于前台筛选展示。</p>
             <UInput v-model="state.category" placeholder="例：数码影音" />
-          </UFormGroup>
+          </UFormField>
         </div>
 
         <div class="grid gap-4 md:grid-cols-3">
-          <UFormGroup label="销售价 (元)" name="price" required>
+          <UFormField label="销售价 (元)" name="price" required>
             <p class="mb-1 text-xs text-muted">示例：199.00；系统会保存为两位小数。</p>
             <UInput v-model.number="state.price" type="number" min="0" step="0.01" />
-          </UFormGroup>
-          <UFormGroup label="库存数量" name="stock" required>
+          </UFormField>
+          <UFormField label="库存数量" name="stock" required>
             <p class="mb-1 text-xs text-muted">示例：50；若暂未备货，可先填写 0。</p>
             <UInput v-model.number="state.stock" type="number" min="0" step="1" />
-          </UFormGroup>
-          <UFormGroup label="商品状态" name="status" required>
+          </UFormField>
+          <UFormField label="商品状态" name="status" required>
             <p class="mb-1 text-xs text-muted">请选择商品当前所处阶段。</p>
             <USelect
               v-model="state.status"
@@ -212,7 +218,7 @@ function isFetchError(error: unknown): error is FetchError {
               placeholder="请选择商品状态"
               value-key="value"
             />
-          </UFormGroup>
+          </UFormField>
         </div>
 
         <UAlert

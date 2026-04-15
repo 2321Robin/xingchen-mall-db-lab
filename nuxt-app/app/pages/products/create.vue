@@ -125,11 +125,17 @@ function isFetchError(error: unknown): error is FetchError {
         description="仅需填写基础字段，即可将商品加入系统。"
         :links="[
           {
+            label: '返回主界面',
+            icon: 'i-lucide-home',
+            to: '/dashboard',
+            color: 'neutral',
+            variant: 'ghost'
+          },
+          {
             label: '返回商品列表',
             icon: 'i-lucide-arrow-left',
             to: '/products',
-            color: 'neutral',
-            variant: 'ghost'
+            color: 'primary'
           }
         ]"
       />
@@ -144,7 +150,7 @@ function isFetchError(error: unknown): error is FetchError {
         </template>
 
         <div class="grid gap-4 md:grid-cols-2">
-          <UFormGroup
+          <UFormField
             label="商品名称"
             name="name"
             required
@@ -153,8 +159,8 @@ function isFetchError(error: unknown): error is FetchError {
           >
             <p class="mb-1 text-xs text-muted">示例：星辰蓝牙耳机；建议 10-20 个字，方便用户识别。</p>
             <UInput v-model="state.name" placeholder="例：星辰蓝牙耳机" />
-          </UFormGroup>
-          <UFormGroup
+          </UFormField>
+          <UFormField
             label="商品 SKU"
             name="sku"
             required
@@ -163,8 +169,8 @@ function isFetchError(error: unknown): error is FetchError {
           >
             <p class="mb-1 text-xs text-muted">示例：SC-AIR-01；建议遵循品牌-品类-序号的格式。</p>
             <UInput v-model="state.sku" placeholder="例：SC-AIR-01" />
-          </UFormGroup>
-          <UFormGroup
+          </UFormField>
+          <UFormField
             label="商品分类"
             name="category"
             required
@@ -174,7 +180,7 @@ function isFetchError(error: unknown): error is FetchError {
           >
             <p class="mb-1 text-xs text-muted">示例：数码影音；分类用于前台筛选展示。</p>
             <UInput v-model="state.category" placeholder="例：数码影音" />
-          </UFormGroup>
+          </UFormField>
         </div>
       </UCard>
 
@@ -187,7 +193,7 @@ function isFetchError(error: unknown): error is FetchError {
         </template>
 
         <div class="grid gap-4 md:grid-cols-3">
-          <UFormGroup
+          <UFormField
             label="销售价 (元)"
             name="price"
             required
@@ -196,8 +202,8 @@ function isFetchError(error: unknown): error is FetchError {
           >
             <p class="mb-1 text-xs text-muted">示例：199.00；系统会保存为两位小数。</p>
             <UInput v-model.number="state.price" type="number" min="0" step="0.01" />
-          </UFormGroup>
-          <UFormGroup
+          </UFormField>
+          <UFormField
             label="库存数量"
             name="stock"
             required
@@ -206,8 +212,8 @@ function isFetchError(error: unknown): error is FetchError {
           >
             <p class="mb-1 text-xs text-muted">示例：50；若暂未备货，可先填写 0。</p>
             <UInput v-model.number="state.stock" type="number" min="0" step="1" />
-          </UFormGroup>
-          <UFormGroup
+          </UFormField>
+          <UFormField
             label="商品状态"
             name="status"
             required
@@ -216,7 +222,7 @@ function isFetchError(error: unknown): error is FetchError {
           >
             <p class="mb-1 text-xs text-muted">请选择商品当前所处阶段。</p>
             <USelect v-model="state.status" :items="statusOptions" placeholder="请选择商品状态" value-key="value" />
-          </UFormGroup>
+          </UFormField>
         </div>
       </UCard>
 

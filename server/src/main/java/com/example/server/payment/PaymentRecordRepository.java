@@ -1,7 +1,5 @@
 package com.example.server.payment;
 
-import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,29 +16,16 @@ public interface PaymentRecordRepository extends JpaRepository<PaymentRecord, Lo
 
     Optional<PaymentRecord> findTopByOrderIdOrderByCreatedAtDesc(Long orderId);
 
-    @Query(value = """
-            select latest.order_id as orderId,
-                   latest.payment_status as paymentStatus,
-                   latest.payment_method as paymentMethod,
-                   latest.paid_at as paidAt
-            from (
-                select pr.order_id,
-                       pr.payment_status,
-                       pr.payment_method,
-                       pr.paid_at,
-                       row_number() over (
-                           partition by pr.order_id
-                           order by case when pr.paid_at is null then 1 else 0 end,
-                                    pr.paid_at desc,
-                                    pr.created_at desc,
-                                    pr.id desc
-                       ) as rn
-                from payment_records pr
-                where pr.order_id in (:orderIds)
-            ) latest
-            where latest.rn = 1
-            """, nativeQuery = true)
-    List<LatestPaymentSummaryRow> findLatestPaymentSummaryRowsByOrderIds(@Param("orderIds") Collection<Long> orderIds);
+    @Query("""
+            select pr
+            from PaymentRecord pr
+            where pr.order.id in :orderIds
+            order by case when pr.paidAt is null then 1 else 0 end,
+                     pr.paidAt desc,
+                     pr.createdAt desc,
+                     pr.id desc
+            """)
+    List<PaymentRecord> findPaymentRecordsForOrderIdsOrdered(@Param("orderIds") Collection<Long> orderIds);
 
     default Map<Long, OrderPaymentSummary> findLatestPaymentSummariesByOrderIds(Collection<Long> orderIds) {
         if (orderIds == null || orderIds.isEmpty()) {
@@ -48,26 +33,10 @@ public interface PaymentRecordRepository extends JpaRepository<PaymentRecord, Lo
         }
 
         Map<Long, OrderPaymentSummary> summaries = new LinkedHashMap<>();
-        for (LatestPaymentSummaryRow row : findLatestPaymentSummaryRowsByOrderIds(orderIds)) {
-            summaries.put(
-                    row.getOrderId(),
-                    new OrderPaymentSummary(
-                            row.getPaymentStatus(),
-                            row.getPaymentMethod(),
-                            row.getPaidAt() != null ? row.getPaidAt().toInstant() : null
-                    )
-            );
+        for (PaymentRecord record : findPaymentRecordsForOrderIdsOrdered(orderIds)) {
+            Long orderId = record.getOrder().getId();
+            summaries.putIfAbsent(orderId, OrderPaymentSummary.from(record));
         }
         return summaries;
-    }
-
-    interface LatestPaymentSummaryRow {
-        Long getOrderId();
-
-        String getPaymentStatus();
-
-        String getPaymentMethod();
-
-        OffsetDateTime getPaidAt();
     }
 }

@@ -39,8 +39,7 @@ const formError = ref('')
 const success = ref(false)
 const successMessage = ref('')
 const showPassword = reactive({
-  password: false,
-  confirmPassword: false
+  password: false
 })
 
 const validateEmail = (email: string) => {
@@ -175,7 +174,7 @@ function isFetchError(error: unknown): error is FetchError {
 
         <UForm :state="state" class="space-y-6" @submit="onSubmit">
           <div class="space-y-4">
-            <UFormGroup label="账号昵称" name="account" required>
+            <UFormField label="账号昵称" name="account" required>
               <UInput
                 v-model="state.account"
                 size="lg"
@@ -184,9 +183,9 @@ function isFetchError(error: unknown): error is FetchError {
                 placeholder="请输入账号昵称"
                 class="w-full"
               />
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="邮箱" name="email" required>
+            <UFormField label="邮箱" name="email" required>
               <UInput
                 v-model="state.email"
                 type="email"
@@ -196,9 +195,9 @@ function isFetchError(error: unknown): error is FetchError {
                 placeholder="请输入常用邮箱"
                 class="w-full"
               />
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="手机号" name="phone" required>
+            <UFormField label="手机号" name="phone" required>
               <UInput
                 v-model="state.phone"
                 size="lg"
@@ -208,9 +207,9 @@ function isFetchError(error: unknown): error is FetchError {
                 placeholder="请输入中国大陆手机号"
                 class="w-full"
               />
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="设置密码" name="password" required>
+            <UFormField label="设置密码" name="password" required>
               <UInput
                 v-model="state.password"
                 :type="showPassword.password ? 'text' : 'password'"
@@ -233,32 +232,19 @@ function isFetchError(error: unknown): error is FetchError {
                   </UButton>
                 </template>
               </UInput>
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="确认密码" name="confirmPassword" required>
+            <UFormField label="确认密码" name="confirmPassword" required>
               <UInput
                 v-model="state.confirmPassword"
-                :type="showPassword.confirmPassword ? 'text' : 'password'"
+                type="password"
                 size="lg"
                 icon="i-lucide-lock"
                 autocomplete="new-password"
                 placeholder="再次输入密码"
                 class="w-full"
-              >
-                <template #trailing>
-                  <UButton
-                    variant="ghost"
-                    color="neutral"
-                    size="xs"
-                    class="flex h-8 w-8 items-center justify-center p-0"
-                    :aria-label="showPassword.confirmPassword ? '隐藏密码' : '显示密码'"
-                    @click.stop="showPassword.confirmPassword = !showPassword.confirmPassword"
-                  >
-                    <UIcon :name="showPassword.confirmPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" />
-                  </UButton>
-                </template>
-              </UInput>
-            </UFormGroup>
+              />
+            </UFormField>
 
             <div class="space-y-3">
               <UCheckbox

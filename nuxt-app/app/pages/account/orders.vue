@@ -196,10 +196,10 @@ onUnmounted(() => {
       <UPageHeader
       title="我的订单"
       description="查看历史订单状态并处理待付款订单。"
-      :links="[
-        {
-          label: '返回控制台',
-          icon: 'i-lucide-layout-dashboard',
+        :links="[
+          {
+          label: '返回主界面',
+          icon: 'i-lucide-home',
           to: '/dashboard',
           color: 'neutral',
           variant: 'ghost'

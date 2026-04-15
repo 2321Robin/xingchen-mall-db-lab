@@ -360,8 +360,8 @@ onUnmounted(() => {
         description="浏览星辰商城在售商品，支持关键字搜索与分类筛选。"
         :links="[
           {
-            label: '返回控制台',
-            icon: 'i-lucide-layout-dashboard',
+            label: '返回主界面',
+            icon: 'i-lucide-home',
             to: '/dashboard',
             color: 'neutral',
             variant: 'ghost'

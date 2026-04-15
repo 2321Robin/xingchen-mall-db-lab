@@ -147,7 +147,7 @@ function isFetchError(error: unknown): error is FetchError {
 
         <UForm :state="state" class="space-y-6" @submit="onSubmit">
           <div class="space-y-4">
-            <UFormGroup label="账号 / 手机号 / 邮箱" name="identifier" required>
+            <UFormField label="账号 / 手机号 / 邮箱" name="identifier" required>
               <UInput
                 v-model="state.identifier"
                 size="lg"
@@ -156,9 +156,9 @@ function isFetchError(error: unknown): error is FetchError {
                 placeholder="请输入账号、手机号或邮箱"
                 class="w-full"
               />
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="注册邮箱" name="email" required>
+            <UFormField label="注册邮箱" name="email" required>
               <UInput
                 v-model="state.email"
                 type="email"
@@ -168,9 +168,9 @@ function isFetchError(error: unknown): error is FetchError {
                 placeholder="请输入绑定邮箱"
                 class="w-full"
               />
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="新密码" name="newPassword" required>
+            <UFormField label="新密码" name="newPassword" required>
               <UInput
                 v-model="state.newPassword"
                 :type="showPassword.newPassword ? 'text' : 'password'"
@@ -193,9 +193,9 @@ function isFetchError(error: unknown): error is FetchError {
                   </UButton>
                 </template>
               </UInput>
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="确认新密码" name="confirmPassword" required>
+            <UFormField label="确认新密码" name="confirmPassword" required>
               <UInput
                 v-model="state.confirmPassword"
                 :type="showPassword.confirmPassword ? 'text' : 'password'"
@@ -218,7 +218,7 @@ function isFetchError(error: unknown): error is FetchError {
                   </UButton>
                 </template>
               </UInput>
-            </UFormGroup>
+            </UFormField>
 
             <transition name="fade" mode="out-in">
               <UAlert

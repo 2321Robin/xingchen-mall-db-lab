@@ -146,7 +146,7 @@ WHERE ua.username = 'user01'
 CREATE OR REPLACE FUNCTION public.validate_review_consistency()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $$
+AS '
 DECLARE
     expected_user_id BIGINT;
     expected_product_id BIGINT;
@@ -158,20 +158,20 @@ BEGIN
     WHERE oi.id = NEW.order_item_id;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'review order_item_id % does not reference an existing order item', NEW.order_item_id;
+        RAISE EXCEPTION ''review order_item_id % does not reference an existing order item'', NEW.order_item_id;
     END IF;
 
     IF NEW.user_id IS DISTINCT FROM expected_user_id THEN
-        RAISE EXCEPTION 'review user_id % must match order item purchaser %', NEW.user_id, expected_user_id;
+        RAISE EXCEPTION ''review user_id % must match order item purchaser %'', NEW.user_id, expected_user_id;
     END IF;
 
     IF NEW.product_id IS DISTINCT FROM expected_product_id THEN
-        RAISE EXCEPTION 'review product_id % must match order item product %', NEW.product_id, expected_product_id;
+        RAISE EXCEPTION ''review product_id % must match order item product %'', NEW.product_id, expected_product_id;
     END IF;
 
     RETURN NEW;
 END;
-$$;
+';
 
 DROP TRIGGER IF EXISTS trg_reviews_validate_consistency ON public.reviews;
 
@@ -183,7 +183,7 @@ CREATE TRIGGER trg_reviews_validate_consistency
 CREATE OR REPLACE FUNCTION public.prevent_review_breakage_from_order_update()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $$
+AS '
 BEGIN
     IF EXISTS (
         SELECT 1
@@ -192,12 +192,12 @@ BEGIN
         WHERE oi.order_id = OLD.id
             AND r.user_id IS DISTINCT FROM NEW.user_id
     ) THEN
-        RAISE EXCEPTION 'cannot update orders.user_id for order % because dependent reviews exist', OLD.id;
+        RAISE EXCEPTION ''cannot update orders.user_id for order % because dependent reviews exist'', OLD.id;
     END IF;
 
     RETURN NEW;
 END;
-$$;
+';
 
 DROP TRIGGER IF EXISTS trg_orders_protect_review_consistency ON public.orders;
 
@@ -209,7 +209,7 @@ CREATE TRIGGER trg_orders_protect_review_consistency
 CREATE OR REPLACE FUNCTION public.prevent_review_breakage_from_order_item_update()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $$
+AS '
 BEGIN
     IF NEW.product_id IS DISTINCT FROM OLD.product_id AND EXISTS (
         SELECT 1
@@ -217,7 +217,7 @@ BEGIN
         WHERE r.order_item_id = OLD.id
             AND r.product_id IS DISTINCT FROM NEW.product_id
     ) THEN
-        RAISE EXCEPTION 'cannot update order_items.product_id for order item % because dependent reviews exist', OLD.id;
+        RAISE EXCEPTION ''cannot update order_items.product_id for order item % because dependent reviews exist'', OLD.id;
     END IF;
 
     IF NEW.order_id IS DISTINCT FROM OLD.order_id AND EXISTS (
@@ -227,12 +227,12 @@ BEGIN
         WHERE r.order_item_id = OLD.id
             AND r.user_id IS DISTINCT FROM o.user_id
     ) THEN
-        RAISE EXCEPTION 'cannot update order_items.order_id for order item % because dependent reviews exist', OLD.id;
+        RAISE EXCEPTION ''cannot update order_items.order_id for order item % because dependent reviews exist'', OLD.id;
     END IF;
 
     RETURN NEW;
 END;
-$$;
+';
 
 DROP TRIGGER IF EXISTS trg_order_items_protect_review_consistency ON public.order_items;
 

@@ -295,7 +295,7 @@ function isFetchError(error: unknown): error is FetchError {
           {
             label: '返回主界面',
             icon: 'i-lucide-home',
-            to: '/',
+            to: '/dashboard',
             color: 'neutral',
             variant: 'ghost'
           }
@@ -400,10 +400,10 @@ function isFetchError(error: unknown): error is FetchError {
 
           <div class="space-y-4">
             <UForm :state="priceForm" @submit.prevent="submitPrice">
-              <UFormGroup label="订单金额 (元)" name="totalAmount" required>
+              <UFormField label="订单金额 (元)" name="totalAmount" required>
                 <p class="mb-1 text-xs text-muted">示例：299.00；修改后系统会保留两位小数。</p>
                 <UInput v-model.number="priceForm.totalAmount" type="number" min="0" step="0.01" />
-              </UFormGroup>
+              </UFormField>
             </UForm>
 
             <UAlert
@@ -435,7 +435,7 @@ function isFetchError(error: unknown): error is FetchError {
 
           <div class="space-y-4">
             <UForm :state="statusForm" @submit.prevent="submitStatus">
-              <UFormGroup label="订单状态" name="status" required>
+              <UFormField label="订单状态" name="status" required>
                 <p class="mb-1 text-xs text-muted">请选择当前订单所处阶段，方便用户跟踪。</p>
                 <USelect
                   v-model="statusForm.status"
@@ -443,7 +443,7 @@ function isFetchError(error: unknown): error is FetchError {
                   placeholder="请选择订单状态"
                   value-key="value"
                 />
-              </UFormGroup>
+              </UFormField>
             </UForm>
 
             <UAlert

@@ -186,7 +186,7 @@ function isFetchError(error: unknown): error is FetchError {
         </transition>
 
         <div class="flex justify-end gap-3">
-          <UButton color="neutral" variant="ghost" to="/dashboard">返回</UButton>
+          <UButton color="neutral" variant="ghost" to="/dashboard">返回主界面</UButton>
           <UButton type="submit" :loading="submitting" icon="i-lucide-save">确认修改</UButton>
         </div>
       </UForm>

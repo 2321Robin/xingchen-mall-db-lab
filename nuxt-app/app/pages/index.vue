@@ -124,7 +124,7 @@ function isFetchError(error: unknown): error is FetchError {
 
         <UForm :state="state" class="space-y-6" @submit="onSubmit">
           <div class="space-y-4">
-            <UFormGroup label="账号" name="account" required>
+            <UFormField label="账号" name="account" required>
               <UInput
                 v-model="state.account"
                 size="lg"
@@ -133,9 +133,9 @@ function isFetchError(error: unknown): error is FetchError {
                 placeholder="请输入手机号 / 邮箱 / 账号"
                 class="w-full"
               />
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="密码" name="password" required>
+            <UFormField label="密码" name="password" required>
               <UInput
                 v-model="state.password"
                 :type="showPassword ? 'text' : 'password'"
@@ -158,7 +158,7 @@ function isFetchError(error: unknown): error is FetchError {
                   </UButton>
                 </template>
               </UInput>
-            </UFormGroup>
+            </UFormField>
 
             <div class="flex items-center justify-between">
               <UCheckbox v-model="state.rememberMe" label="记住登录状态" />

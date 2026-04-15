@@ -247,6 +247,13 @@ onUnmounted(() => {
         description="管理购物车商品，调整数量或清空购物车。"
         :links="[
           {
+            label: '返回主界面',
+            icon: 'i-lucide-home',
+            to: '/dashboard',
+            color: 'neutral',
+            variant: 'ghost'
+          },
+          {
             label: '继续逛逛',
             icon: 'i-lucide-store',
             to: '/shop',
