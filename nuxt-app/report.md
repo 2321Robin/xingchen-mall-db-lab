@@ -186,6 +186,7 @@ erDiagram
     }
 
     USER_ACCOUNTS ||--o{ USER_ADDRESSES : has
+    USER_ACCOUNTS ||--o{ CART_ITEMS : owns
     USER_ACCOUNTS ||--o{ ORDERS : places
     USER_ACCOUNTS ||--o{ REVIEWS : writes
 
@@ -237,12 +238,8 @@ erDiagram
 
 外键设计如下：
 
-- `user_addresses.user_id` 关联 `user_accounts.id`。
-- `cart_items.user_id`、`cart_items.product_id` 分别关联用户与商品。
-- `orders.user_id` 关联用户。
-- `order_items.order_id` 关联订单，`order_items.product_id` 关联商品来源。
-- `payment_records.order_id` 关联订单。
-- `reviews.user_id`、`reviews.product_id`、`reviews.order_item_id` 分别关联用户、商品和订单明细。
+- 当前数据库层明确建立的外键包括：`user_addresses.user_id`、`orders.user_id`、`cart_items.product_id`、`order_items.order_id`、`payment_records.order_id`、`reviews.user_id`、`reviews.product_id`、`reviews.order_item_id`。
+- `cart_items.user_id`、`orders.shipping_address_id`、`order_items.product_id` 在当前实现中主要通过应用层逻辑、快照字段和业务校验维持一致性，没有全部固化为数据库外键。这一做法降低了历史数据迁移和快照保留的冲突，但也意味着部分一致性更多依赖程序约束。
 
 唯一约束设计如下：
 
@@ -266,7 +263,24 @@ erDiagram
 - `idx_payment_records_order` 用于加速订单支付记录查询及 `order_detail_view` 的支付摘要获取。
 - `idx_reviews_product_id` 和 `idx_reviews_user_id` 用于加速评价统计、商品评价展示和用户评价查询。
 
-在性能验证中，可针对支付记录或评价统计 SQL 执行 `EXPLAIN ANALYZE`，观察是否由顺序扫描转为索引扫描、过滤成本是否下降、总执行时间是否缩短。该验证方式直接对应课程中“基于实际场景验证索引效果”的要求。
+在性能验证中，可针对地址查询、支付记录查询或评价统计 SQL 执行 `EXPLAIN ANALYZE`。例如在当前实验数据库中执行：
+
+```sql
+EXPLAIN ANALYZE
+SELECT *
+FROM user_addresses
+WHERE user_id = 1;
+```
+
+得到的实际计划中出现了：
+
+```text
+Index Scan using idx_user_addresses_default on user_addresses
+Index Cond: (user_id = 1)
+Execution Time: 0.153 ms
+```
+
+这说明在地址查询场景中，优化器已经能够利用索引而不是仅依赖全表顺序扫描。对于 `payment_records`、`reviews` 等记录量继续增长的表，也可通过同样方式比较建索引前后的执行计划、缓冲命中与总耗时，从而满足课程中“基于实际场景验证索引效果”的要求。
 
 ### 4.4 关系模式合理性分析
 
@@ -287,7 +301,7 @@ erDiagram
 
 ### 5.2 视图与一致性保护
 
-数据库中创建了 `order_detail_view` 视图，用于封装订单详情查询。该视图综合 `orders`、`user_accounts`、`order_items`、`payment_records` 等表的数据，对外输出订单编号、订单状态、用户信息、商品明细以及最新支付摘要。视图的业务意义在于将课堂演示和前端展示中反复出现的联表逻辑统一封装，降低重复 SQL 编写成本，并保证查询口径一致。
+数据库中创建了 `order_detail_view` 视图，用于封装订单详情查询。该视图综合 `orders`、`user_accounts`、`order_items`、`payment_records` 等表的数据，对外输出订单编号、订单状态、用户信息、商品明细以及最新支付摘要。视图的主要作用是为数据库层联表展示、课堂验收和 SQL 复用提供统一口径，而不是由当前前端页面直接调用。
 
 为避免一个订单存在多条支付记录时重复放大订单明细，`order_detail_view` 内部先选择每个订单最新的一条支付记录，再与订单和订单明细连接，因此视图结果保持为“一行对应一条订单明细”的稳定结构。
 
@@ -327,8 +341,8 @@ erDiagram
 - `cart`：处理购物车项的新增、修改和删除。
 - `order`：处理订单创建、订单查询和后台订单管理。
 - `payment`：处理支付记录创建、支付状态维护和订单支付摘要。
-- `review`：处理评价写入、评价查询以及评价一致性保护。
-- `report`：处理统计报表、视图调用和复杂查询结果返回。
+- `review`：当前主要提供评价实体与仓库层建模，并通过 JPA 校验和 PostgreSQL 触发器保证评价一致性。
+- `report`：处理统计报表和复杂查询结果返回。
 
 这些模块共同支撑了商城系统从用户操作到数据统计的完整业务链路，其中与数据库实验要求关联最紧密的是 `order`、`payment`、`review` 和 `report` 四个模块。
 
@@ -345,9 +359,9 @@ erDiagram
 - 管理端商品管理页面。
 - 管理端订单管理页面。
 - 管理端用户管理页面。
-- 统计与报表展示页面。
+- 管理端首页统计卡片与数据概览区域。
 
-这些页面已覆盖课程要求中的基础 CRUD、查询和统计功能，并在提交失败、参数错误、库存不足、重复操作等情况下显示明确的中文校验信息和提示文本，体现了应用层完整性约束要求。
+这些页面已覆盖课程要求中的基础 CRUD、查询和统计功能，并在提交失败、参数错误、库存不足、重复操作等情况下显示明确的中文校验信息和提示文本，体现了应用层完整性约束要求。统计功能当前主要体现在管理端首页汇总卡片和订单/用户/商品管理场景中的数据展示，而评价相关能力目前主要落实在数据库结构、仓库层与一致性保护层面。
 
 ### 6.4 代表性业务流程
 
@@ -357,36 +371,67 @@ erDiagram
 
 2. 支付订单流程
 
-用户对待支付订单发起支付后，系统更新订单状态，并在 `payment_records` 中生成支付流水、支付方式、支付金额和支付时间。之后，订单详情查询可通过 `order_detail_view` 直接展示最新支付摘要。该流程体现了订单状态与支付行为分离建模的优势。
+用户对待支付订单发起支付后，系统更新订单状态，并在 `payment_records` 中生成支付流水、支付方式、支付金额和支付时间。当前程序通过订单查询路径返回支付摘要，而 `order_detail_view` 主要保留用于数据库层联表展示、测试和课堂验收说明。该流程体现了订单状态与支付行为分离建模的优势。
 
 3. 评价商品流程
 
-用户仅能对已购买的商品提交评价。应用层先校验订单明细与当前用户、商品之间是否匹配，再写入 `reviews`。若绕过应用层直接写库，PostgreSQL 触发器仍会再次检查一致性，从而保证评价与真实购买行为绑定。该流程体现了数据库约束与程序校验协同工作的实现思路。
+在当前实现中，评价逻辑主要体现在数据模型和一致性保护层：`reviews` 记录必须与真实存在的 `order_item_id`、`user_id`、`product_id` 保持一致。应用层通过实体校验约束对象关系，数据库层再通过触发器阻止不一致写入或父表更新破坏评价关联。该流程体现了数据库约束与程序校验协同工作的实现思路。
 
-### 6.5 视图、复杂查询与性能验证
+### 6.5 功能流程图
 
-程序实现中直接使用了 `order_detail_view` 和“用户消费与商品偏好统计查询”两个与课程要求强相关的数据库对象。
+下面给出“创建订单并支付”的代表性流程图：
 
-`order_detail_view` 的作用是为订单详情展示提供统一的数据出口，减少后端重复拼接联表 SQL 的复杂度，也便于前端页面按统一结构展示订单、商品和支付信息。
+```mermaid
+flowchart TD
+    A[用户在前端勾选购物车商品] --> B[提交创建订单请求]
+    B --> C[后端校验用户与收货地址]
+    C --> D[读取购物车项并校验商品状态与库存]
+    D --> E[生成 orders 记录与 order_items 记录]
+    E --> F[写入地址快照和商品快照]
+    F --> G[计算 total_amount 并保存订单]
+    G --> H[用户发起支付]
+    H --> I[后端锁定订单并校验状态]
+    I --> J[写入 payment_records]
+    J --> K[更新订单状态为 PAID]
+    K --> L[返回订单响应和支付摘要]
+```
+
+### 6.6 关键数据结构和函数实现
+
+为满足实验报告中“关键数据结构和函数实现”的要求，系统中有代表性的结构和函数如下：
+
+- `OrderUserService.createOrder(...)`：负责从购物车生成正式订单，写入 `orders`、`order_items`，并保存地址与商品快照，是交易主流程的核心函数。
+- `OrderUserService.markAsPaid(...)`：负责支付时的状态校验、悲观锁控制、支付记录写入和订单状态更新。
+- `OrderPaymentSummary`：用于把支付记录压缩为订单响应中的支付摘要结构，便于前端直接展示支付状态、支付方式和支付时间。
+- `CustomerConsumptionReportRepository.fetchCustomerConsumptionReport()`：负责执行“用户消费与商品偏好统计查询”，汇总用户订单数、购买件数、支付总额、最近支付时间和偏好类别。
+- `Review` 实体中的一致性校验逻辑与 PostgreSQL 触发器：共同保证 `reviews` 与 `order_items`、`orders`、`products` 的引用关系不被破坏。
+
+### 6.7 视图、复杂查询与性能验证
+
+程序实现中重点使用了“用户消费与商品偏好统计查询”这一复杂查询，同时在数据库层创建了 `order_detail_view` 用于课堂展示、联表封装和验收说明。
+
+`order_detail_view` 的作用是为订单详情类联表结果提供统一的数据出口，减少重复编写多表连接 SQL 的复杂度，并使订单、商品和支付摘要的口径保持一致。当前项目主要在数据库脚本、测试与验收说明中使用该视图。
 
 “用户消费与商品偏好统计查询”由 `report` 模块提供，至少涉及 `user_accounts`、`orders`、`order_items`、`products`、`payment_records` 等 5 张表，通过连接、分组统计以及窗口函数计算每位用户的订单数、购买件数、支付总金额、最近支付时间和最偏好商品类别，因此满足“3 张及以上表连接或带分组统计的复杂查询”要求，并具有实际业务分析意义。
 
-针对索引验证，系统可在 PostgreSQL 中对典型查询执行如下语句：
+针对索引验证，系统可在 PostgreSQL 中对典型查询执行真实业务 SQL，例如：
 
 ```sql
 EXPLAIN ANALYZE
-SELECT ...
+SELECT *
+FROM user_addresses
+WHERE user_id = 1;
 ```
 
-或对统计查询执行：
+在当前实验数据库中的结果表明，该查询已经使用索引扫描：
 
-```sql
-EXPLAIN ANALYZE
-WITH ...
-SELECT ...
+```text
+Index Scan using idx_user_addresses_default on user_addresses
+Index Cond: (user_id = 1)
+Execution Time: 0.153 ms
 ```
 
-通过比较添加索引前后的执行计划，可以观察地址查询、支付记录查询、评价统计查询等场景是否由顺序扫描变为索引扫描，以及执行时间和估算成本是否下降。该过程为实验报告中的索引效果分析提供了直接证据。
+对于 `payment_records`、`reviews` 和复杂统计查询，也可继续用同样方式执行 `EXPLAIN ANALYZE`，比较不同数据规模下的执行计划、过滤代价和总耗时变化。这样既能说明索引已经被优化器采用，也能为课程要求中的“索引效果验证”提供具体证据。
 
 ## 7. 总结和心得体会
 
