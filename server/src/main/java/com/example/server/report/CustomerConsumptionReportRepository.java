@@ -36,7 +36,7 @@ public class CustomerConsumptionReportRepository {
                 WHERE pr.payment_status = 'SUCCESS'
                 GROUP BY o.user_id
             ) pay ON pay.user_id = u.id
-            JOIN (
+            LEFT JOIN (
                 SELECT user_id, favorite_category, category_buy_count
                 FROM (
                     SELECT

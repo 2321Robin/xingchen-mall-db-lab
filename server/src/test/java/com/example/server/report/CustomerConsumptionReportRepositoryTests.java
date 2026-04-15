@@ -81,6 +81,73 @@ class CustomerConsumptionReportRepositoryTests {
     }
 
     @Test
+    void complexReportKeepsUserWhenOrderItemsHaveNoMatchingProduct() {
+        UserAccount user = createUser("report-user-null-product", "report-user-null-product@example.com", "13900000031");
+
+        CustomerOrder order = createOrder(user, "ORD-REPORT-NULL-PRODUCT", OrderStatus.PAID, new BigDecimal("88.00"));
+        createOrderItem(order, null, "缺失商品", "MISSING-SKU", 2, new BigDecimal("44.00"));
+        createPayment(order, "PAY-REPORT-NULL-PRODUCT", new BigDecimal("88.00"), Instant.parse("2026-04-17T09:00:00Z"));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<CustomerConsumptionReportRow> rows = reportRepository.fetchCustomerConsumptionReport();
+
+        assertThat(rows)
+                .filteredOn(row -> row.userId().equals(user.getId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.username()).isEqualTo("report-user-null-product");
+                    assertThat(row.orderCount()).isEqualTo(1L);
+                    assertThat(row.totalItems()).isEqualTo(2L);
+                    assertThat(row.totalPaidAmount()).isEqualByComparingTo("88.00");
+                    assertThat(row.lastPaidAt()).isEqualTo(Instant.parse("2026-04-17T09:00:00Z"));
+                    assertThat(row.favoriteCategory()).isNull();
+                    assertThat(row.categoryBuyCount()).isNull();
+                });
+    }
+
+    @Test
+    void complexReportAndViewDoNotMultiplyOrderItemsAcrossMultiplePayments() {
+        UserAccount user = createUser("report-user-multi-payment", "report-user-multi-payment@example.com", "13900000032");
+        Product product = createProduct("REPORT-MULTI-PAY", "测试分类", new BigDecimal("50.00"));
+
+        CustomerOrder order = createOrder(user, "ORD-REPORT-MULTI-PAY", OrderStatus.PAID, new BigDecimal("100.00"));
+        OrderItem orderItem = createOrderItem(order, product, 2, new BigDecimal("50.00"));
+        createPayment(order, "PAY-REPORT-MULTI-PAY-1", new BigDecimal("20.00"), Instant.parse("2026-04-17T08:00:00Z"));
+        createPayment(order, "PAY-REPORT-MULTI-PAY-2", new BigDecimal("80.00"), Instant.parse("2026-04-17T10:30:00Z"));
+
+        entityManager.flush();
+        recreateOrderDetailView();
+        entityManager.clear();
+
+        List<CustomerConsumptionReportRow> rows = reportRepository.fetchCustomerConsumptionReport();
+        Object[] viewRow = (Object[]) entityManager.getEntityManager()
+                .createNativeQuery("""
+                        SELECT quantity, payment_status, paid_at
+                        FROM order_detail_view
+                        WHERE order_item_id = :orderItemId
+                        """)
+                .setParameter("orderItemId", orderItem.getId())
+                .getSingleResult();
+
+        assertThat(rows)
+                .filteredOn(row -> row.userId().equals(user.getId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.orderCount()).isEqualTo(1L);
+                    assertThat(row.totalItems()).isEqualTo(2L);
+                    assertThat(row.totalPaidAmount()).isEqualByComparingTo("100.00");
+                    assertThat(row.lastPaidAt()).isEqualTo(Instant.parse("2026-04-17T10:30:00Z"));
+                    assertThat(row.favoriteCategory()).isEqualTo("测试分类");
+                    assertThat(row.categoryBuyCount()).isEqualTo(2L);
+                });
+        assertThat(((Number) viewRow[0]).longValue()).isEqualTo(2L);
+        assertThat(viewRow[1]).isEqualTo("SUCCESS");
+        assertThat(toInstant(viewRow[2])).isEqualTo(Instant.parse("2026-04-17T10:30:00Z"));
+    }
+
+    @Test
     void reviewPersistsWhenReferencesMatchOrderItem() {
         ReviewFixture fixture = createFixture();
         Review review = createReview(fixture);
@@ -168,11 +235,16 @@ class CustomerConsumptionReportRepositoryTests {
     }
 
     private OrderItem createOrderItem(CustomerOrder order, Product product, int quantity, BigDecimal unitPrice) {
+        return createOrderItem(order, product, product.getName(), product.getSku(), quantity, unitPrice);
+    }
+
+    private OrderItem createOrderItem(CustomerOrder order, Product product, String productName, String productSku, int quantity,
+            BigDecimal unitPrice) {
         OrderItem orderItem = new OrderItem();
         orderItem.setOrder(order);
-        orderItem.setProductId(product.getId());
-        orderItem.setProductName(product.getName());
-        orderItem.setProductSku(product.getSku());
+        orderItem.setProductId(product == null ? null : product.getId());
+        orderItem.setProductName(productName);
+        orderItem.setProductSku(productSku);
         orderItem.setQuantity(quantity);
         orderItem.setUnitPrice(unitPrice);
         entityManager.persist(orderItem);
@@ -189,6 +261,49 @@ class CustomerConsumptionReportRepositoryTests {
         paymentRecord.setPaidAt(paidAt);
         entityManager.persist(paymentRecord);
         return paymentRecord;
+    }
+
+    private void recreateOrderDetailView() {
+        entityManager.getEntityManager().createNativeQuery("DROP VIEW IF EXISTS order_detail_view").executeUpdate();
+        entityManager.getEntityManager().createNativeQuery("""
+                CREATE VIEW order_detail_view AS
+                SELECT
+                    o.id AS order_id,
+                    o.order_number,
+                    ua.id AS user_id,
+                    ua.username,
+                    o.status AS order_status,
+                    o.created_at AS order_created_at,
+                    oi.id AS order_item_id,
+                    oi.product_id,
+                    oi.product_name,
+                    oi.product_sku,
+                    oi.quantity,
+                    oi.unit_price,
+                    oi.quantity * oi.unit_price AS item_amount,
+                    latest_payment.payment_status,
+                    latest_payment.payment_method,
+                    latest_payment.paid_at
+                FROM orders o
+                JOIN user_accounts ua ON ua.id = o.user_id
+                JOIN order_items oi ON oi.order_id = o.id
+                LEFT JOIN (
+                    SELECT order_id, payment_status, payment_method, paid_at
+                    FROM (
+                        SELECT
+                            pr.order_id,
+                            pr.payment_status,
+                            pr.payment_method,
+                            pr.paid_at,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY pr.order_id
+                                ORDER BY pr.paid_at DESC, pr.id DESC
+                            ) AS payment_rank
+                        FROM payment_records pr
+                    ) ranked_payments
+                    WHERE payment_rank = 1
+                ) latest_payment ON latest_payment.order_id = o.id
+                """).executeUpdate();
     }
 
     private UserAccount createUser(String username, String email, String phone) {
@@ -213,6 +328,19 @@ class CustomerConsumptionReportRepositoryTests {
         product.setStatus(ProductStatus.ACTIVE);
         entityManager.persist(product);
         return product;
+    }
+
+    private Instant toInstant(Object value) {
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        if (value instanceof java.time.OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toInstant();
+        }
+        if (value instanceof java.time.LocalDateTime localDateTime) {
+            return localDateTime.toInstant(java.time.ZoneOffset.UTC);
+        }
+        return ((java.sql.Timestamp) value).toInstant();
     }
 
     private record ReviewFixture(UserAccount user, Product product, OrderItem orderItem) {

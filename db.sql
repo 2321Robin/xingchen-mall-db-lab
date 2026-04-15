@@ -170,13 +170,23 @@ CREATE VIEW public.order_detail_view AS
     oi.quantity,
     oi.unit_price,
     (oi.quantity::numeric * oi.unit_price) AS item_amount,
-    pr.payment_status,
-    pr.payment_method,
-    pr.paid_at
+    latest_payment.payment_status,
+    latest_payment.payment_method,
+    latest_payment.paid_at
    FROM (((public.orders o
      JOIN public.user_accounts ua ON ((ua.id = o.user_id)))
      JOIN public.order_items oi ON ((oi.order_id = o.id)))
-     LEFT JOIN public.payment_records pr ON ((pr.order_id = o.id)));
+     LEFT JOIN ( SELECT ranked_payments.order_id,
+            ranked_payments.payment_status,
+            ranked_payments.payment_method,
+            ranked_payments.paid_at
+           FROM ( SELECT pr.order_id,
+                    pr.payment_status,
+                    pr.payment_method,
+                    pr.paid_at,
+                    row_number() OVER (PARTITION BY pr.order_id ORDER BY pr.paid_at DESC NULLS LAST, pr.id DESC) AS payment_rank
+                   FROM public.payment_records pr) ranked_payments
+          WHERE (ranked_payments.payment_rank = 1)) latest_payment ON ((latest_payment.order_id = o.id)));
 
 
 ALTER VIEW public.order_detail_view OWNER TO postgres;

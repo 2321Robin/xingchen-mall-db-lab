@@ -256,10 +256,25 @@ SELECT
     oi.quantity,
     oi.unit_price,
     oi.quantity * oi.unit_price AS item_amount,
-    pr.payment_status,
-    pr.payment_method,
-    pr.paid_at
+    latest_payment.payment_status,
+    latest_payment.payment_method,
+    latest_payment.paid_at
 FROM orders o
 JOIN user_accounts ua ON ua.id = o.user_id
 JOIN order_items oi ON oi.order_id = o.id
-LEFT JOIN payment_records pr ON pr.order_id = o.id;
+LEFT JOIN (
+    SELECT order_id, payment_status, payment_method, paid_at
+    FROM (
+        SELECT
+            pr.order_id,
+            pr.payment_status,
+            pr.payment_method,
+            pr.paid_at,
+            ROW_NUMBER() OVER (
+                PARTITION BY pr.order_id
+                ORDER BY pr.paid_at DESC NULLS LAST, pr.id DESC
+            ) AS payment_rank
+        FROM payment_records pr
+    ) ranked_payments
+    WHERE payment_rank = 1
+) latest_payment ON latest_payment.order_id = o.id;
