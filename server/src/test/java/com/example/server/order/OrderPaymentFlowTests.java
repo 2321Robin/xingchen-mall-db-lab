@@ -12,6 +12,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 
 import com.example.server.cart.CartItem;
 import com.example.server.cart.CartItemRepository;
@@ -31,6 +33,7 @@ import com.example.server.user.address.UserAddressRepository;
 
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
 
 @SpringBootTest
 @TestPropertySource(properties = {
@@ -40,6 +43,7 @@ import jakarta.persistence.EntityManager;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=update",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+        "spring.jpa.properties.hibernate.generate_statistics=true",
         "spring.jpa.defer-datasource-initialization=false",
         "spring.sql.init.mode=always",
         "spring.sql.init.schema-locations=classpath:order/order-payment-flow-legacy-schema.sql",
@@ -74,6 +78,9 @@ class OrderPaymentFlowTests {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     @Test
     void createOrderPersistsProductIdWithoutBreakingLegacyOrderItems() {
@@ -302,6 +309,83 @@ class OrderPaymentFlowTests {
         assertThat(fetched.paymentStatus()).isEqualTo("SUCCESS");
         assertThat(fetched.paymentMethod()).isEqualTo("ALIPAY");
         assertThat(fetched.paidAt()).isNotNull();
+    }
+
+    @Test
+    void listOrdersLoadsPaymentSummariesInBatchWhileKeepingItemsLoaded() {
+        UserAccount user = new UserAccount();
+        user.setUsername("buyer05");
+        user.setPasswordHash("{noop}secret");
+        user.setEmail("buyer05@example.com");
+        user.setPhone("13900000005");
+        user.setRole(UserRole.CUSTOMER);
+        user.setActive(true);
+        user = userAccountRepository.save(user);
+
+        UserAddress address = new UserAddress();
+        address.setUser(user);
+        address.setRecipientName("孙七");
+        address.setPhone("13900000005");
+        address.setProvince("广东省");
+        address.setCity("东莞市");
+        address.setDistrict("南城区");
+        address.setStreet("鸿福路 66 号");
+        address.setPostalCode("523000");
+        address.setDefault(true);
+        address = userAddressRepository.save(address);
+
+        Product firstProduct = new Product();
+        firstProduct.setName("星环键盘");
+        firstProduct.setSku("SC-KEY-01");
+        firstProduct.setCategory("数码配件");
+        firstProduct.setPrice(new BigDecimal("199.00"));
+        firstProduct.setStock(10);
+        firstProduct.setStatus(ProductStatus.ACTIVE);
+        firstProduct = productRepository.save(firstProduct);
+
+        CartItem firstCartItem = new CartItem();
+        firstCartItem.setUserId(user.getId());
+        firstCartItem.setProduct(firstProduct);
+        firstCartItem.setQuantity(1);
+        cartItemRepository.save(firstCartItem);
+
+        OrderResponse firstOrder = orderUserService.createOrder(user.getId(), new CreateOrderRequest(address.getId()));
+        orderUserService.markAsPaid(user.getId(), firstOrder.id());
+
+        Product secondProduct = new Product();
+        secondProduct.setName("星环鼠标");
+        secondProduct.setSku("SC-MOUSE-01");
+        secondProduct.setCategory("数码配件");
+        secondProduct.setPrice(new BigDecimal("129.00"));
+        secondProduct.setStock(10);
+        secondProduct.setStatus(ProductStatus.ACTIVE);
+        secondProduct = productRepository.save(secondProduct);
+
+        CartItem secondCartItem = new CartItem();
+        secondCartItem.setUserId(user.getId());
+        secondCartItem.setProduct(secondProduct);
+        secondCartItem.setQuantity(2);
+        cartItemRepository.save(secondCartItem);
+
+        OrderResponse secondOrder = orderUserService.createOrder(user.getId(), new CreateOrderRequest(address.getId()));
+        orderUserService.markAsPaid(user.getId(), secondOrder.id());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        java.util.List<OrderResponse> orders = orderUserService.listOrders(user.getId());
+
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
+        assertThat(orders).hasSize(2);
+        assertThat(orders).allSatisfy(order -> {
+            assertThat(order.items()).singleElement();
+            assertThat(order.paymentStatus()).isEqualTo("SUCCESS");
+            assertThat(order.paymentMethod()).isEqualTo("ALIPAY");
+            assertThat(order.paidAt()).isNotNull();
+        });
     }
 
     @Test

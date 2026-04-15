@@ -1,11 +1,9 @@
 package com.example.server.order;
 
-import java.util.Comparator;
 import java.util.List;
 
 import com.example.server.order.dto.OrderItemResponse;
 import com.example.server.order.dto.OrderResponse;
-import com.example.server.payment.PaymentRecord;
 
 final class OrderMapper {
 
@@ -13,6 +11,10 @@ final class OrderMapper {
     }
 
     static OrderResponse toResponse(CustomerOrder order) {
+        return toResponse(order, null);
+    }
+
+    static OrderResponse toResponse(CustomerOrder order, OrderPaymentSummary paymentSummary) {
         List<OrderItemResponse> items = order.getItems().stream()
                 .map(item -> new OrderItemResponse(
                         item.getId(),
@@ -22,19 +24,6 @@ final class OrderMapper {
                         item.getUnitPrice()
                 ))
                 .toList();
-
-        PaymentRecord latestPayment = order.getPaymentRecords().stream()
-                .max(Comparator.comparing(
-                        PaymentRecord::getPaidAt,
-                        Comparator.nullsFirst(Comparator.naturalOrder())
-                ).thenComparing(
-                        PaymentRecord::getCreatedAt,
-                        Comparator.nullsFirst(Comparator.naturalOrder())
-                ).thenComparing(
-                        PaymentRecord::getId,
-                        Comparator.nullsFirst(Comparator.naturalOrder())
-                ))
-                .orElse(null);
 
         return new OrderResponse(
                 order.getId(),
@@ -54,9 +43,9 @@ final class OrderMapper {
                 order.getShippingStreet(),
                 order.getShippingPostalCode(),
                 items,
-                latestPayment != null && latestPayment.getPaymentStatus() != null ? latestPayment.getPaymentStatus().name() : null,
-                latestPayment != null && latestPayment.getPaymentMethod() != null ? latestPayment.getPaymentMethod().name() : null,
-                latestPayment != null ? latestPayment.getPaidAt() : null
+                paymentSummary != null ? paymentSummary.paymentStatus() : null,
+                paymentSummary != null ? paymentSummary.paymentMethod() : null,
+                paymentSummary != null ? paymentSummary.paidAt() : null
         );
     }
 }

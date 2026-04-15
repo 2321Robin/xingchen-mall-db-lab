@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import com.example.server.order.dto.CreateOrderRequest;
 import com.example.server.order.dto.OrderResponse;
 import com.example.server.payment.PaymentMethod;
 import com.example.server.payment.PaymentRecord;
+import com.example.server.payment.PaymentRecordRepository;
 import com.example.server.payment.PaymentStatus;
 import com.example.server.product.Product;
 import com.example.server.product.ProductStatus;
@@ -37,17 +39,20 @@ public class OrderUserService {
     private final CartService cartService;
     private final CartItemRepository cartItemRepository;
     private final CustomerOrderRepository customerOrderRepository;
+    private final PaymentRecordRepository paymentRecordRepository;
     private final UserAccountRepository userAccountRepository;
     private final UserAddressRepository userAddressRepository;
 
     public OrderUserService(CartService cartService,
                             CartItemRepository cartItemRepository,
                             CustomerOrderRepository customerOrderRepository,
+                            PaymentRecordRepository paymentRecordRepository,
                             UserAccountRepository userAccountRepository,
                             UserAddressRepository userAddressRepository) {
         this.cartService = cartService;
         this.cartItemRepository = cartItemRepository;
         this.customerOrderRepository = customerOrderRepository;
+        this.paymentRecordRepository = paymentRecordRepository;
         this.userAccountRepository = userAccountRepository;
         this.userAddressRepository = userAddressRepository;
     }
@@ -77,8 +82,12 @@ public class OrderUserService {
     @Transactional(readOnly = true)
     public List<OrderResponse> listOrders(Long userId) {
         requireUser(userId);
-        return customerOrderRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(OrderMapper::toResponse)
+        List<CustomerOrder> orders = customerOrderRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        Map<Long, OrderPaymentSummary> paymentSummaries = paymentRecordRepository.findLatestPaymentSummariesByOrderIds(
+                orders.stream().map(CustomerOrder::getId).toList()
+        );
+        return orders.stream()
+                .map(order -> OrderMapper.toResponse(order, paymentSummaries.get(order.getId())))
                 .toList();
     }
 
@@ -87,7 +96,7 @@ public class OrderUserService {
         requireUser(userId);
         CustomerOrder order = customerOrderRepository.findByIdAndUserId(orderId, userId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
-        return OrderMapper.toResponse(order);
+        return OrderMapper.toResponse(order, loadLatestPaymentSummary(order.getId()));
     }
 
     @Transactional
@@ -176,7 +185,11 @@ public class OrderUserService {
         order.getPaymentRecords().add(paymentRecord);
         order.setStatus(OrderStatus.PAID);
 
-        return OrderMapper.toResponse(order);
+        return OrderMapper.toResponse(order, OrderPaymentSummary.from(paymentRecord));
+    }
+
+    private OrderPaymentSummary loadLatestPaymentSummary(Long orderId) {
+        return paymentRecordRepository.findLatestPaymentSummariesByOrderIds(List.of(orderId)).get(orderId);
     }
 
     private UserAccount requireUser(Long userId) {
