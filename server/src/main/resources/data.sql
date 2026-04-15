@@ -240,3 +240,26 @@ CREATE TRIGGER trg_order_items_protect_review_consistency
     BEFORE UPDATE OF product_id, order_id ON public.order_items
     FOR EACH ROW
     EXECUTE FUNCTION public.prevent_review_breakage_from_order_item_update();
+
+CREATE OR REPLACE VIEW public.order_detail_view AS
+SELECT
+    o.id AS order_id,
+    o.order_number,
+    ua.id AS user_id,
+    ua.username,
+    o.status AS order_status,
+    o.created_at AS order_created_at,
+    oi.id AS order_item_id,
+    oi.product_id,
+    oi.product_name,
+    oi.product_sku,
+    oi.quantity,
+    oi.unit_price,
+    oi.quantity * oi.unit_price AS item_amount,
+    pr.payment_status,
+    pr.payment_method,
+    pr.paid_at
+FROM orders o
+JOIN user_accounts ua ON ua.id = o.user_id
+JOIN order_items oi ON oi.order_id = o.id
+LEFT JOIN payment_records pr ON pr.order_id = o.id;

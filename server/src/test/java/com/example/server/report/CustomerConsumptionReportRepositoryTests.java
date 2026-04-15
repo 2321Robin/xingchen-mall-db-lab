@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,11 +13,15 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import com.example.server.order.CustomerOrder;
 import com.example.server.order.OrderItem;
 import com.example.server.order.OrderStatus;
+import com.example.server.payment.PaymentMethod;
+import com.example.server.payment.PaymentRecord;
+import com.example.server.payment.PaymentStatus;
 import com.example.server.product.Product;
 import com.example.server.product.ProductStatus;
 import com.example.server.review.Review;
@@ -25,6 +31,7 @@ import com.example.server.user.UserRole;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
+@Import(CustomerConsumptionReportRepository.class)
 @TestPropertySource(properties = {
         "spring.sql.init.mode=never",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"
@@ -32,10 +39,46 @@ import com.example.server.user.UserRole;
 class CustomerConsumptionReportRepositoryTests {
 
     @Autowired
+    private CustomerConsumptionReportRepository reportRepository;
+
+    @Autowired
     private ReviewRepository reviewRepository;
 
     @Autowired
     private TestEntityManager entityManager;
+
+    @Test
+    void complexReportReturnsFavoriteCategoryAndPaymentSummary() {
+        UserAccount user = createUser("report-user-1", "report-user-1@example.com", "13900000021");
+        Product digitalOne = createProduct("REPORT-DIGITAL-1", "数码影音", new BigDecimal("299.00"));
+        Product digitalTwo = createProduct("REPORT-DIGITAL-2", "数码影音", new BigDecimal("199.00"));
+        Product wearable = createProduct("REPORT-WEARABLE-1", "智能穿戴", new BigDecimal("399.00"));
+
+        CustomerOrder firstOrder = createOrder(user, "ORD-REPORT-1", OrderStatus.PAID, new BigDecimal("698.00"));
+        createOrderItem(firstOrder, digitalOne, 1, new BigDecimal("299.00"));
+        createOrderItem(firstOrder, wearable, 1, new BigDecimal("399.00"));
+        createPayment(firstOrder, "PAY-REPORT-1", new BigDecimal("698.00"), Instant.parse("2026-04-15T10:15:30Z"));
+
+        CustomerOrder secondOrder = createOrder(user, "ORD-REPORT-2", OrderStatus.SHIPPED, new BigDecimal("398.00"));
+        createOrderItem(secondOrder, digitalTwo, 2, new BigDecimal("199.00"));
+        createPayment(secondOrder, "PAY-REPORT-2", new BigDecimal("398.00"), Instant.parse("2026-04-16T08:00:00Z"));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<CustomerConsumptionReportRow> rows = reportRepository.fetchCustomerConsumptionReport();
+
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.userId()).isEqualTo(user.getId());
+            assertThat(row.username()).isEqualTo("report-user-1");
+            assertThat(row.orderCount()).isEqualTo(2L);
+            assertThat(row.totalItems()).isEqualTo(4L);
+            assertThat(row.totalPaidAmount()).isEqualByComparingTo("1096.00");
+            assertThat(row.lastPaidAt()).isEqualTo(Instant.parse("2026-04-16T08:00:00Z"));
+            assertThat(row.favoriteCategory()).isEqualTo("数码影音");
+            assertThat(row.categoryBuyCount()).isEqualTo(3L);
+        });
+    }
 
     @Test
     void reviewPersistsWhenReferencesMatchOrderItem() {
@@ -75,7 +118,7 @@ class CustomerConsumptionReportRepositoryTests {
     void reviewRejectsMismatchedUserAndProductForOrderItem() {
         ReviewFixture fixture = createFixture();
         UserAccount anotherUser = createUser("review-user-2", "review-user-2@example.com", "13900000012");
-        Product anotherProduct = createProduct("REVIEW-SKU-2");
+        Product anotherProduct = createProduct("REVIEW-SKU-2", "测试分类", new BigDecimal("99.00"));
 
         Review review = createReview(fixture);
         review.setUserId(anotherUser.getId());
@@ -104,25 +147,48 @@ class CustomerConsumptionReportRepositoryTests {
 
     private ReviewFixture createFixture() {
         UserAccount user = createUser("review-user-1", "review-user-1@example.com", "13900000011");
-        Product product = createProduct("REVIEW-SKU-1");
+        Product product = createProduct("REVIEW-SKU-1", "测试分类", new BigDecimal("99.00"));
 
+        CustomerOrder order = createOrder(user, "ORD-REVIEW-1", OrderStatus.PAID, product.getPrice());
+        OrderItem orderItem = createOrderItem(order, product, 1, product.getPrice());
+
+        entityManager.flush();
+
+        return new ReviewFixture(user, product, orderItem);
+    }
+
+    private CustomerOrder createOrder(UserAccount user, String orderNumber, OrderStatus status, BigDecimal totalAmount) {
         CustomerOrder order = new CustomerOrder();
-        order.setOrderNumber("ORD-REVIEW-1");
+        order.setOrderNumber(orderNumber);
         order.setUser(user);
-        order.setStatus(OrderStatus.PAID);
-        order.setTotalAmount(product.getPrice());
+        order.setStatus(status);
+        order.setTotalAmount(totalAmount);
         entityManager.persist(order);
+        return order;
+    }
 
+    private OrderItem createOrderItem(CustomerOrder order, Product product, int quantity, BigDecimal unitPrice) {
         OrderItem orderItem = new OrderItem();
         orderItem.setOrder(order);
         orderItem.setProductId(product.getId());
         orderItem.setProductName(product.getName());
         orderItem.setProductSku(product.getSku());
-        orderItem.setQuantity(1);
-        orderItem.setUnitPrice(product.getPrice());
-        entityManager.persistAndFlush(orderItem);
+        orderItem.setQuantity(quantity);
+        orderItem.setUnitPrice(unitPrice);
+        entityManager.persist(orderItem);
+        return orderItem;
+    }
 
-        return new ReviewFixture(user, product, orderItem);
+    private PaymentRecord createPayment(CustomerOrder order, String paymentNo, BigDecimal amount, Instant paidAt) {
+        PaymentRecord paymentRecord = new PaymentRecord();
+        paymentRecord.setOrder(order);
+        paymentRecord.setPaymentNo(paymentNo);
+        paymentRecord.setPaymentMethod(PaymentMethod.ALIPAY);
+        paymentRecord.setAmount(amount);
+        paymentRecord.setPaymentStatus(PaymentStatus.SUCCESS);
+        paymentRecord.setPaidAt(paidAt);
+        entityManager.persist(paymentRecord);
+        return paymentRecord;
     }
 
     private UserAccount createUser(String username, String email, String phone) {
@@ -137,12 +203,12 @@ class CustomerConsumptionReportRepositoryTests {
         return user;
     }
 
-    private Product createProduct(String sku) {
+    private Product createProduct(String sku, String category, BigDecimal price) {
         Product product = new Product();
         product.setName("测试商品-" + sku);
         product.setSku(sku);
-        product.setCategory("测试分类");
-        product.setPrice(new BigDecimal("99.00"));
+        product.setCategory(category);
+        product.setPrice(price);
         product.setStock(10);
         product.setStatus(ProductStatus.ACTIVE);
         entityManager.persist(product);
