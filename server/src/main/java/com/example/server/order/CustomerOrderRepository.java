@@ -13,17 +13,17 @@ import org.springframework.data.repository.query.Param;
 
 public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
 
-    @EntityGraph(attributePaths = {"user", "paymentRecords"})
+    @EntityGraph(attributePaths = {"user", "items"})
     List<CustomerOrder> findAllByOrderByCreatedAtDesc();
 
-    @EntityGraph(attributePaths = {"user", "paymentRecords"})
+    @EntityGraph(attributePaths = {"user", "items"})
     List<CustomerOrder> findByUserIdOrderByCreatedAtDesc(Long userId);
 
-    @EntityGraph(attributePaths = {"user", "paymentRecords"})
+    @EntityGraph(attributePaths = {"user", "items"})
     Optional<CustomerOrder> findByIdAndUserId(Long id, Long userId);
 
     @Override
-    @EntityGraph(attributePaths = {"user", "paymentRecords"})
+    @EntityGraph(attributePaths = {"user", "items"})
     Optional<CustomerOrder> findById(Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

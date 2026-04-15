@@ -240,6 +240,71 @@ class OrderPaymentFlowTests {
     }
 
     @Test
+    void orderResponsePrefersLatestSuccessfulPaymentAndKeepsItemsLoaded() {
+        UserAccount user = new UserAccount();
+        user.setUsername("buyer04");
+        user.setPasswordHash("{noop}secret");
+        user.setEmail("buyer04@example.com");
+        user.setPhone("13900000004");
+        user.setRole(UserRole.CUSTOMER);
+        user.setActive(true);
+        user = userAccountRepository.save(user);
+
+        UserAddress address = new UserAddress();
+        address.setUser(user);
+        address.setRecipientName("赵六");
+        address.setPhone("13900000004");
+        address.setProvince("广东省");
+        address.setCity("佛山市");
+        address.setDistrict("禅城区");
+        address.setStreet("季华路 18 号");
+        address.setPostalCode("528000");
+        address.setDefault(true);
+        address = userAddressRepository.save(address);
+
+        Product product = new Product();
+        product.setName("星云移动电源");
+        product.setSku("SC-POWER-01");
+        product.setCategory("数码配件");
+        product.setPrice(new BigDecimal("129.00"));
+        product.setStock(10);
+        product.setStatus(ProductStatus.ACTIVE);
+        product = productRepository.save(product);
+
+        CartItem cartItem = new CartItem();
+        cartItem.setUserId(user.getId());
+        cartItem.setProduct(product);
+        cartItem.setQuantity(2);
+        cartItemRepository.save(cartItem);
+
+        OrderResponse created = orderUserService.createOrder(user.getId(), new CreateOrderRequest(address.getId()));
+        orderUserService.markAsPaid(user.getId(), created.id());
+
+        CustomerOrder order = customerOrderRepository.findById(created.id()).orElseThrow();
+        PaymentRecord pendingRecord = new PaymentRecord();
+        pendingRecord.setOrder(order);
+        pendingRecord.setPaymentNo("PAY-PENDING-" + created.orderNumber());
+        pendingRecord.setPaymentMethod(com.example.server.payment.PaymentMethod.WECHAT);
+        pendingRecord.setAmount(order.getTotalAmount());
+        pendingRecord.setPaymentStatus(PaymentStatus.PENDING);
+        pendingRecord.setPaidAt(null);
+        paymentRecordRepository.saveAndFlush(pendingRecord);
+
+        entityManager.clear();
+
+        OrderResponse fetched = orderUserService.getOrder(user.getId(), created.id());
+
+        assertThat(fetched.items()).singleElement().satisfies(item -> {
+            assertThat(item.productName()).isEqualTo("星云移动电源");
+            assertThat(item.productSku()).isEqualTo("SC-POWER-01");
+            assertThat(item.quantity()).isEqualTo(2);
+        });
+        assertThat(fetched.paymentStatus()).isEqualTo("SUCCESS");
+        assertThat(fetched.paymentMethod()).isEqualTo("ALIPAY");
+        assertThat(fetched.paidAt()).isNotNull();
+    }
+
+    @Test
     void paymentUpdateLookupUsesPessimisticWriteLock() throws NoSuchMethodException {
         Method method = CustomerOrderRepository.class.getMethod(
                 "findByIdAndUserIdForUpdate",

@@ -26,13 +26,13 @@ final class OrderMapper {
         PaymentRecord latestPayment = order.getPaymentRecords().stream()
                 .max(Comparator.comparing(
                         PaymentRecord::getPaidAt,
-                        Comparator.nullsLast(Comparator.naturalOrder())
+                        Comparator.nullsFirst(Comparator.naturalOrder())
                 ).thenComparing(
                         PaymentRecord::getCreatedAt,
-                        Comparator.nullsLast(Comparator.naturalOrder())
+                        Comparator.nullsFirst(Comparator.naturalOrder())
                 ).thenComparing(
                         PaymentRecord::getId,
-                        Comparator.nullsLast(Comparator.naturalOrder())
+                        Comparator.nullsFirst(Comparator.naturalOrder())
                 ))
                 .orElse(null);
 
