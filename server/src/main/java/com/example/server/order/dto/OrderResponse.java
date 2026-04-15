@@ -23,6 +23,9 @@ public record OrderResponse(
         String shippingDistrict,
         String shippingStreet,
         String shippingPostalCode,
-        List<OrderItemResponse> items
+        List<OrderItemResponse> items,
+        String paymentStatus,
+        String paymentMethod,
+        Instant paidAt
 ) {
 }

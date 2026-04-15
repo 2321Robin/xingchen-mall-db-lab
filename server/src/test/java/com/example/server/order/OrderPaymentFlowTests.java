@@ -30,6 +30,7 @@ import com.example.server.user.address.UserAddress;
 import com.example.server.user.address.UserAddressRepository;
 
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.EntityManager;
 
 @SpringBootTest
 @TestPropertySource(properties = {
@@ -70,6 +71,9 @@ class OrderPaymentFlowTests {
 
     @Autowired
     private PaymentRecordRepository paymentRecordRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @Test
     void createOrderPersistsProductIdWithoutBreakingLegacyOrderItems() {
@@ -182,6 +186,57 @@ class OrderPaymentFlowTests {
         assertThat(record.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(record.getAmount()).isPositive();
         assertThat(record.getPaidAt()).isNotNull();
+    }
+
+    @Test
+    void orderResponseIncludesLatestPaymentSummary() {
+        UserAccount user = new UserAccount();
+        user.setUsername("buyer03");
+        user.setPasswordHash("{noop}secret");
+        user.setEmail("buyer03@example.com");
+        user.setPhone("13900000003");
+        user.setRole(UserRole.CUSTOMER);
+        user.setActive(true);
+        user = userAccountRepository.save(user);
+
+        UserAddress address = new UserAddress();
+        address.setUser(user);
+        address.setRecipientName("王五");
+        address.setPhone("13900000003");
+        address.setProvince("广东省");
+        address.setCity("珠海市");
+        address.setDistrict("香洲区");
+        address.setStreet("情侣路 8 号");
+        address.setPostalCode("519000");
+        address.setDefault(true);
+        address = userAddressRepository.save(address);
+
+        Product product = new Product();
+        product.setName("星河数据线");
+        product.setSku("SC-CABLE-01");
+        product.setCategory("数码配件");
+        product.setPrice(new BigDecimal("39.00"));
+        product.setStock(10);
+        product.setStatus(ProductStatus.ACTIVE);
+        product = productRepository.save(product);
+
+        CartItem cartItem = new CartItem();
+        cartItem.setUserId(user.getId());
+        cartItem.setProduct(product);
+        cartItem.setQuantity(1);
+        cartItemRepository.save(cartItem);
+
+        OrderResponse created = orderUserService.createOrder(user.getId(), new CreateOrderRequest(address.getId()));
+        orderUserService.markAsPaid(user.getId(), created.id());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        OrderResponse fetched = orderUserService.getOrder(user.getId(), created.id());
+
+        assertThat(fetched.paymentStatus()).isEqualTo("SUCCESS");
+        assertThat(fetched.paymentMethod()).isEqualTo("ALIPAY");
+        assertThat(fetched.paidAt()).isNotNull();
     }
 
     @Test
