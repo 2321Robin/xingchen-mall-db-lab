@@ -203,6 +203,40 @@ class ReviewServiceTests {
     }
 
     @Test
+    void getUserReviewByProductKeepsLatestCreatedReviewAfterOlderReviewIsEdited() {
+        Product product = createProduct("SKU-REVIEW-STABLE-001", "商品-REVIEW-STABLE-001");
+        UserAccount user = createUser("review-stable-user", "review-stable-user@example.com", nextPhone("review-stable-user"));
+        OrderItem olderOrderItem = createOrderItem(
+                createOrder(user, "REVIEW-STABLE-OLDER-001", OrderStatus.DELIVERED),
+                product);
+        OrderItem newerOrderItem = createOrderItem(
+                createOrder(user, "REVIEW-STABLE-NEWER-001", OrderStatus.DELIVERED),
+                product);
+        entityManager.flush();
+
+        reviewService.createReview(user.getId(), new CreateReviewRequest(
+                olderOrderItem.getId(),
+                4,
+                "较早评价"));
+        reviewService.createReview(user.getId(), new CreateReviewRequest(
+                newerOrderItem.getId(),
+                5,
+                "较新评价"));
+
+        reviewService.updateReview(
+                user.getId(),
+                olderOrderItem.getId(),
+                new CreateReviewRequest(olderOrderItem.getId(), 3, "修改较早评价"));
+
+        ReviewResponse response = reviewService.getUserReviewByProduct(
+                user.getId(),
+                product.getId());
+
+        assertThat(response.orderItemId()).isEqualTo(newerOrderItem.getId());
+        assertThat(response.content()).isEqualTo("较新评价");
+    }
+
+    @Test
     void createReviewTranslatesDuplicateConstraintDuringSave() {
         ReviewRepository duplicateReviewRepository = mock(ReviewRepository.class);
         CustomerOrderRepository orderRepository = mock(CustomerOrderRepository.class);

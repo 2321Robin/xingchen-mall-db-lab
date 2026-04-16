@@ -118,7 +118,7 @@ public class ReviewService {
     }
 
     public ReviewResponse getUserReviewByProduct(Long userId, Long productId) {
-        Review review = reviewRepository.findFirstByUserIdAndProductIdOrderByUpdatedAtDescCreatedAtDesc(userId, productId)
+        Review review = reviewRepository.findFirstByUserIdAndProductIdOrderByCreatedAtDescIdDesc(userId, productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到评价"));
         return toResponse(review);
     }
