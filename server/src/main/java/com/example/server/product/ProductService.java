@@ -42,6 +42,14 @@ public class ProductService {
         return ProductMapper.toResponse(product);
     }
 
+    @Transactional(readOnly = true)
+    public ProductResponse getActiveProduct(Long id) {
+        Product product = productRepository.findById(id)
+                .filter(item -> item.getStatus() == ProductStatus.ACTIVE)
+                .orElseThrow(() -> new ProductNotFoundException(id));
+        return ProductMapper.toResponse(product);
+    }
+
     @Transactional
     public ProductResponse createProduct(CreateProductRequest request) {
         if (productRepository.existsBySku(request.sku())) {

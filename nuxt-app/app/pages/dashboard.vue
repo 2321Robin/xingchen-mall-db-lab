@@ -116,6 +116,7 @@ const quickLinks = computed<QuickLink[]>(() => {
       { label: '我的订单', icon: 'i-lucide-receipt', to: '/account/orders', color: 'primary' },
       { label: '商品管理', icon: 'i-lucide-package', to: '/products', color: 'primary' },
       { label: '订单管理', icon: 'i-lucide-truck', to: '/orders', color: 'primary' },
+      { label: '评价管理', icon: 'i-lucide-message-square-heart', to: '/reviews', color: 'primary' },
       { label: '用户管理', icon: 'i-lucide-users', to: '/users', color: 'primary' },
       { label: '修改密码', icon: 'i-lucide-key-round', to: '/account/password', color: 'neutral' }
     ]

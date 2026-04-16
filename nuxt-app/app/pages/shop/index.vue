@@ -354,11 +354,18 @@ onUnmounted(() => {
 
 <template>
   <div class="py-10">
-    <div class="mx-auto max-w-6xl space-y-8 px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-7xl space-y-8 px-4 sm:px-6 lg:px-8">
       <UPageHeader
         title="商城商品"
         description="浏览星辰商城在售商品，支持关键字搜索与分类筛选。"
         :links="[
+          {
+            label: '购物车',
+            icon: 'i-lucide-shopping-cart',
+            to: '/cart',
+            color: 'primary',
+            variant: 'soft'
+          },
           {
             label: '返回主界面',
             icon: 'i-lucide-home',
@@ -479,9 +486,19 @@ onUnmounted(() => {
                     />
                   </div>
                   <UButton
+                    size="sm"
+                    color="neutral"
+                    variant="soft"
+                    icon="i-lucide-eye"
+                    class="h-8 shrink-0"
+                    :to="`/shop/${product.id}`"
+                  >
+                    查看详情
+                  </UButton>
+                  <UButton
                     icon="i-lucide-shopping-cart"
                     size="sm"
-                    class="flex-1"
+                    class="h-8 min-w-[7rem] flex-1 justify-center whitespace-nowrap"
                     :disabled="!canPurchase(product) || loading"
                     :loading="isAdding(product.id)"
                     @click="addToCart(product)"
