@@ -1,8 +1,10 @@
 package com.example.server.review;
 
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -39,7 +41,7 @@ public class ReviewService {
     }
 
     @Transactional
-    public ReviewResponse createReview(CreateReviewRequest request) {
+    public ReviewResponse createReview(Long userId, CreateReviewRequest request) {
         CustomerOrder order = customerOrderRepository.findByOrderItemId(request.orderItemId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到订单商品"));
         OrderItem orderItem = order.getItems().stream()
@@ -47,7 +49,7 @@ public class ReviewService {
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到订单商品"));
 
-        if (!order.getUser().getId().equals(request.userId())) {
+        if (!order.getUser().getId().equals(userId)) {
             throw new ReviewException("只有购买者才能评价该商品");
         }
         if (order.getStatus() != OrderStatus.SHIPPED && order.getStatus() != OrderStatus.DELIVERED) {
@@ -57,7 +59,7 @@ public class ReviewService {
             throw new ReviewException("该订单商品已评价");
         }
 
-        UserAccount user = userAccountRepository.findById(request.userId())
+        UserAccount user = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到用户"));
         Product product = productRepository.findById(orderItem.getProductId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到商品"));
@@ -72,7 +74,14 @@ public class ReviewService {
         review.setRating(request.rating());
         review.setContent(normalizeContent(request.content()));
 
-        return toResponse(reviewRepository.saveAndFlush(review));
+        try {
+            return toResponse(reviewRepository.saveAndFlush(review));
+        } catch (DataIntegrityViolationException exception) {
+            if (isDuplicateOrderItemReview(exception)) {
+                throw new ReviewException("该订单商品已评价");
+            }
+            throw exception;
+        }
     }
 
     public ReviewResponse getUserReviewByOrderItem(Long userId, Long orderItemId) {
@@ -99,6 +108,12 @@ public class ReviewService {
         }
         String trimmed = content.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean isDuplicateOrderItemReview(DataIntegrityViolationException exception) {
+        String message = (exception.getMessage() + " " + exception.getMostSpecificCause().getMessage())
+                .toLowerCase(Locale.ROOT);
+        return message.contains("uk_review_order_item") || message.contains("order_item_id");
     }
 
     private ReviewResponse toResponse(Review review) {

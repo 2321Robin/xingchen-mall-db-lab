@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,14 +26,14 @@ public class ReviewController {
         this.reviewService = reviewService;
     }
 
-    @PostMapping("/api/user/reviews")
+    @PostMapping("/api/user/reviews/{userId}")
     @ResponseStatus(HttpStatus.CREATED)
-    public ReviewResponse createReview(@Valid @RequestBody CreateReviewRequest request) {
-        return reviewService.createReview(request);
+    public ReviewResponse createReview(@PathVariable Long userId, @Valid @RequestBody CreateReviewRequest request) {
+        return reviewService.createReview(userId, request);
     }
 
-    @GetMapping("/api/user/reviews/order-item/{orderItemId}")
-    public ReviewResponse getUserReviewByOrderItem(@PathVariable Long orderItemId, @RequestParam Long userId) {
+    @GetMapping("/api/user/reviews/{userId}/order-item/{orderItemId}")
+    public ReviewResponse getUserReviewByOrderItem(@PathVariable Long userId, @PathVariable Long orderItemId) {
         return reviewService.getUserReviewByOrderItem(userId, orderItemId);
     }
 

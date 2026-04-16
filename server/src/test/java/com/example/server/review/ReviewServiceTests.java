@@ -2,11 +2,15 @@ package com.example.server.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -15,13 +19,16 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import com.example.server.order.CustomerOrder;
+import com.example.server.order.CustomerOrderRepository;
 import com.example.server.order.OrderItem;
 import com.example.server.order.OrderStatus;
 import com.example.server.product.Product;
+import com.example.server.product.ProductRepository;
 import com.example.server.product.ProductStatus;
 import com.example.server.review.dto.CreateReviewRequest;
 import com.example.server.review.dto.ReviewResponse;
 import com.example.server.user.UserAccount;
+import com.example.server.user.UserAccountRepository;
 import com.example.server.user.UserRole;
 
 @DataJpaTest
@@ -46,8 +53,7 @@ class ReviewServiceTests {
     void createReviewAllowsShippedOrderItem() {
         ReviewFixture fixture = createFixture(OrderStatus.SHIPPED, "REVIEW-SHIP-001", "review-ship-user");
 
-        ReviewResponse response = reviewService.createReview(new CreateReviewRequest(
-                fixture.user().getId(),
+        ReviewResponse response = reviewService.createReview(fixture.user().getId(), new CreateReviewRequest(
                 fixture.orderItem().getId(),
                 5,
                 "物流很快，商品也很好"));
@@ -63,14 +69,12 @@ class ReviewServiceTests {
     @Test
     void createReviewRejectsDuplicateOrderItemReview() {
         ReviewFixture fixture = createFixture(OrderStatus.DELIVERED, "REVIEW-DUP-001", "review-dup-user");
-        reviewService.createReview(new CreateReviewRequest(
-                fixture.user().getId(),
+        reviewService.createReview(fixture.user().getId(), new CreateReviewRequest(
                 fixture.orderItem().getId(),
                 4,
                 "第一次评价"));
 
-        assertThatThrownBy(() -> reviewService.createReview(new CreateReviewRequest(
-                fixture.user().getId(),
+        assertThatThrownBy(() -> reviewService.createReview(fixture.user().getId(), new CreateReviewRequest(
                 fixture.orderItem().getId(),
                 5,
                 "重复评价")))
@@ -84,8 +88,7 @@ class ReviewServiceTests {
         UserAccount otherUser = createUser("review-other-user", "review-other-user@example.com", "13900000072");
         entityManager.flush();
 
-        assertThatThrownBy(() -> reviewService.createReview(new CreateReviewRequest(
-                otherUser.getId(),
+        assertThatThrownBy(() -> reviewService.createReview(otherUser.getId(), new CreateReviewRequest(
                 fixture.orderItem().getId(),
                 3,
                 "不是购买者")))
@@ -97,13 +100,57 @@ class ReviewServiceTests {
     void createReviewRejectsNonReviewableOrderStatus() {
         ReviewFixture fixture = createFixture(OrderStatus.PAID, "REVIEW-STATUS-001", "review-status-user");
 
-        assertThatThrownBy(() -> reviewService.createReview(new CreateReviewRequest(
-                fixture.user().getId(),
+        assertThatThrownBy(() -> reviewService.createReview(fixture.user().getId(), new CreateReviewRequest(
                 fixture.orderItem().getId(),
                 2,
                 "还没发货")))
                 .isInstanceOf(ReviewException.class)
                 .hasMessage("当前订单状态不支持评价");
+    }
+
+    @Test
+    void createReviewTranslatesDuplicateConstraintDuringSave() {
+        ReviewRepository duplicateReviewRepository = mock(ReviewRepository.class);
+        CustomerOrderRepository orderRepository = mock(CustomerOrderRepository.class);
+        ProductRepository productRepository = mock(ProductRepository.class);
+        UserAccountRepository accountRepository = mock(UserAccountRepository.class);
+
+        ReviewService service = new ReviewService(
+                duplicateReviewRepository,
+                orderRepository,
+                productRepository,
+                accountRepository);
+
+        Long userId = 1L;
+        Long productId = 2L;
+        Long orderItemId = 3L;
+
+        UserAccount user = mock(UserAccount.class);
+        Product product = mock(Product.class);
+        OrderItem orderItem = mock(OrderItem.class);
+        CustomerOrder order = mock(CustomerOrder.class);
+
+        when(user.getId()).thenReturn(userId);
+        when(product.getId()).thenReturn(productId);
+        when(product.getName()).thenReturn("并发测试商品");
+        when(orderItem.getId()).thenReturn(orderItemId);
+        when(orderItem.getProductId()).thenReturn(productId);
+        when(order.getUser()).thenReturn(user);
+        when(order.getStatus()).thenReturn(OrderStatus.DELIVERED);
+        when(order.getItems()).thenReturn(java.util.List.of(orderItem));
+
+        when(orderRepository.findByOrderItemId(orderItemId)).thenReturn(java.util.Optional.of(order));
+        when(duplicateReviewRepository.existsByOrderItemId(orderItemId)).thenReturn(false);
+        when(accountRepository.findById(userId)).thenReturn(java.util.Optional.of(user));
+        when(productRepository.findById(productId)).thenReturn(java.util.Optional.of(product));
+        when(duplicateReviewRepository.saveAndFlush(any(Review.class))).thenThrow(
+                new DataIntegrityViolationException("duplicate key value violates unique constraint 'uk_review_order_item'"));
+
+        assertThatThrownBy(() -> service.createReview(
+                userId,
+                new CreateReviewRequest(orderItemId, 5, "并发重复评价")))
+                .isInstanceOf(ReviewException.class)
+                .hasMessage("该订单商品已评价");
     }
 
     @Test
@@ -113,18 +160,15 @@ class ReviewServiceTests {
                 targetFirst.product());
         ReviewFixture otherProduct = createFixture(OrderStatus.DELIVERED, "REVIEW-PRODUCT-003", "review-product-user-3");
 
-        reviewService.createReview(new CreateReviewRequest(
-                targetFirst.user().getId(),
+        reviewService.createReview(targetFirst.user().getId(), new CreateReviewRequest(
                 targetFirst.orderItem().getId(),
                 4,
                 "第一条评价"));
-        reviewService.createReview(new CreateReviewRequest(
-                targetSecond.user().getId(),
+        reviewService.createReview(targetSecond.user().getId(), new CreateReviewRequest(
                 targetSecond.orderItem().getId(),
                 5,
                 "第二条评价"));
-        reviewService.createReview(new CreateReviewRequest(
-                otherProduct.user().getId(),
+        reviewService.createReview(otherProduct.user().getId(), new CreateReviewRequest(
                 otherProduct.orderItem().getId(),
                 1,
                 "其他商品评价"));

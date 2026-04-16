@@ -6,8 +6,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record CreateReviewRequest(
-        @NotNull(message = "用户 ID 不能为空")
-        Long userId,
         @NotNull(message = "订单商品 ID 不能为空")
         Long orderItemId,
         @NotNull(message = "评分不能为空")
