@@ -17,6 +17,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.server.order.CustomerOrder;
 import com.example.server.order.CustomerOrderRepository;
@@ -131,7 +132,25 @@ class ReviewServiceTests {
     }
 
     @Test
-    void updateReviewRejectsWrongUser() {
+    void updateReviewRejectsMismatchedOrderItemIdBetweenPathAndBody() {
+        ReviewFixture fixture = createFixture(OrderStatus.SHIPPED, "REVIEW-EDIT-MISMATCH-001", "review-edit-mismatch-user");
+        reviewService.createReview(fixture.user().getId(), new CreateReviewRequest(
+                fixture.orderItem().getId(),
+                4,
+                "原评价"));
+
+        assertThatThrownBy(() -> reviewService.updateReview(
+                fixture.user().getId(),
+                fixture.orderItem().getId(),
+                new CreateReviewRequest(fixture.orderItem().getId() + 1, 2, "错误修改")))
+                .isInstanceOfSatisfying(ResponseStatusException.class, exception -> {
+                    assertThat(exception.getStatusCode().value()).isEqualTo(400);
+                    assertThat(exception.getReason()).isEqualTo("订单商品 ID 与路径参数不一致");
+                });
+    }
+
+    @Test
+    void updateReviewReturnsNotFoundForNonOwner() {
         ReviewFixture fixture = createFixture(OrderStatus.SHIPPED, "REVIEW-EDIT-002", "review-owner-user");
         UserAccount otherUser = createUser("review-edit-other", "review-edit-other@example.com", "13900000111");
         reviewService.createReview(fixture.user().getId(), new CreateReviewRequest(
@@ -143,8 +162,10 @@ class ReviewServiceTests {
                 otherUser.getId(),
                 fixture.orderItem().getId(),
                 new CreateReviewRequest(fixture.orderItem().getId(), 2, "越权修改")))
-                .isInstanceOf(ReviewException.class)
-                .hasMessage("只有购买者才能评价该商品");
+                .isInstanceOfSatisfying(ResponseStatusException.class, exception -> {
+                    assertThat(exception.getStatusCode().value()).isEqualTo(404);
+                    assertThat(exception.getReason()).isEqualTo("未找到评价");
+                });
     }
 
     @Test

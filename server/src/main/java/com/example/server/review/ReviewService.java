@@ -95,7 +95,11 @@ public class ReviewService {
 
     @Transactional
     public ReviewResponse updateReview(Long userId, Long orderItemId, CreateReviewRequest request) {
-        Review review = reviewRepository.findByOrderItemId(orderItemId)
+        if (!orderItemId.equals(request.orderItemId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "订单商品 ID 与路径参数不一致");
+        }
+
+        Review review = reviewRepository.findByOrderItemIdAndUserId(orderItemId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到评价"));
 
         CustomerOrder order = review.getOrderItem().getOrder();

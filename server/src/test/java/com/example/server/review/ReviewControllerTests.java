@@ -18,7 +18,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.server.review.dto.CreateReviewRequest;
 import com.example.server.review.dto.PublicReviewResponse;
@@ -99,6 +101,25 @@ class ReviewControllerTests {
                 request.orderItemId().equals(11L)
                         && request.rating().equals(5)
                         && request.content().equals("修改后的评价")));
+    }
+
+    @Test
+    void updateReviewReturnsBadRequestBodyWhenOrderItemIdMismatchesPath() throws Exception {
+        when(reviewService.updateReview(eq(7L), eq(11L), argThat((CreateReviewRequest request) -> true)))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "订单商品 ID 与路径参数不一致"));
+
+        mockMvc.perform(put("/api/user/reviews/7/order-item/11")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "orderItemId": 12,
+                                  "rating": 5,
+                                  "content": "修改后的评价"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("订单商品 ID 与路径参数不一致"));
     }
 
     @Test
