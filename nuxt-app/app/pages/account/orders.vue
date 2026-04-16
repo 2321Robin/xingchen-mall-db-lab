@@ -23,6 +23,16 @@ type OrderItem = {
   unitPrice: number
 }
 
+type ReviewSummary = {
+  id: number
+  orderItemId: number
+  rating: number
+  content: string | null
+  createdAt: string
+}
+
+type ReviewState = 'reviewed' | 'missing' | 'error'
+
 type Order = {
   id: number
   orderNumber: string
@@ -60,6 +70,8 @@ const errorMessage = ref('')
 const actionError = ref('')
 const actionSuccess = ref('')
 const processingIds = ref<number[]>([])
+const reviewLookup = ref<Record<number, ReviewSummary>>({})
+const reviewStateLookup = ref<Record<number, ReviewState>>({})
 
 const statusBadges: Record<OrderStatus, OrderStatusBadge> = {
   PENDING_PAYMENT: { label: '未付款', description: '订单已生成，等待付款完成。', color: 'warning' },
@@ -71,6 +83,11 @@ const statusBadges: Record<OrderStatus, OrderStatusBadge> = {
 const hasOrders = computed(() => orders.value.length > 0)
 const pendingPaymentCount = computed(() => orders.value.filter(order => order.status === 'PENDING_PAYMENT').length)
 const totalOrderAmount = computed(() => orders.value.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0))
+
+const isReviewableStatus = (status: OrderStatus) => status === 'PAID' || status === 'SHIPPED' || status === 'DELIVERED'
+
+const hasReview = (orderItemId: number) => Boolean(reviewLookup.value[orderItemId])
+const getReviewState = (orderItemId: number) => reviewStateLookup.value[orderItemId]
 
 const formatPrice = (value: number | null | undefined) => {
   if (typeof value !== 'number' || Number.isNaN(value)) {
@@ -143,12 +160,53 @@ const fetchOrders = async () => {
   try {
     const data = await $fetch<Order[]>(`${apiBase}/api/user/orders/${currentUser.value.userId}`)
     orders.value = data
+    await fetchReviewStatuses(data)
   } catch (error) {
     errorMessage.value = extractErrorMessage(error, '加载订单列表失败，请稍后重试')
     orders.value = []
+    reviewLookup.value = {}
+    reviewStateLookup.value = {}
   } finally {
     loading.value = false
   }
+}
+
+const fetchReviewStatuses = async (orderList: Order[]) => {
+  if (!currentUser.value?.userId) {
+    reviewLookup.value = {}
+    reviewStateLookup.value = {}
+    return
+  }
+
+  const eligibleItemIds = orderList
+    .filter(order => isReviewableStatus(order.status))
+    .flatMap(order => order.items.map(item => item.id))
+
+  if (!eligibleItemIds.length) {
+    reviewLookup.value = {}
+    reviewStateLookup.value = {}
+    return
+  }
+
+  const nextLookup: Record<number, ReviewSummary> = {}
+  const nextStateLookup: Record<number, ReviewState> = {}
+
+  await Promise.all(eligibleItemIds.map(async (orderItemId) => {
+    try {
+      const review = await $fetch<ReviewSummary>(`${apiBase}/api/user/reviews/${currentUser.value?.userId}/order-item/${orderItemId}`)
+      nextLookup[orderItemId] = review
+      nextStateLookup[orderItemId] = 'reviewed'
+    } catch (error) {
+      if (isFetchError(error) && error.statusCode === 404) {
+        nextStateLookup[orderItemId] = 'missing'
+      } else {
+        nextStateLookup[orderItemId] = 'error'
+      }
+    }
+  }))
+
+  reviewLookup.value = nextLookup
+  reviewStateLookup.value = nextStateLookup
 }
 
 const payOrder = async (order: Order) => {
@@ -295,9 +353,41 @@ onUnmounted(() => {
                       <p class="text-sm font-semibold">{{ item.productName }}</p>
                       <p class="text-xs text-muted">SKU：{{ item.productSku || '未设置' }}</p>
                     </div>
-                    <div class="flex flex-wrap items-center gap-4 text-sm">
+                    <div class="flex flex-wrap items-center gap-3 text-sm md:justify-end">
                       <span>数量：{{ item.quantity }}</span>
                       <span>单价：￥{{ formatPrice(item.unitPrice) }}</span>
+                       <UButton
+                         v-if="isReviewableStatus(order.status) && getReviewState(item.id) === 'missing'"
+                         size="xs"
+                         color="warning"
+                         variant="soft"
+                         icon="i-lucide-message-square-plus"
+                         title="前往评价页面"
+                         :to="`/account/reviews/${item.id}`"
+                       >
+                         去评价
+                       </UButton>
+                      <UButton
+                        v-else-if="hasReview(item.id)"
+                         size="xs"
+                         color="success"
+                         variant="soft"
+                         icon="i-lucide-badge-check"
+                         title="查看或修改评价"
+                         :to="`/account/reviews/${item.id}`"
+                       >
+                         已评价
+                       </UButton>
+                      <UButton
+                        v-else-if="isReviewableStatus(order.status) && getReviewState(item.id) === 'error'"
+                        size="xs"
+                        color="neutral"
+                        variant="soft"
+                        icon="i-lucide-circle-alert"
+                        @click="fetchOrders"
+                      >
+                        刷新评价状态
+                      </UButton>
                     </div>
                   </div>
                 </div>
