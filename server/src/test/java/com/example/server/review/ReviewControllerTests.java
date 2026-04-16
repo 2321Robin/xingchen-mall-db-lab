@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.example.server.review.dto.CreateReviewRequest;
+import com.example.server.review.dto.PublicReviewResponse;
 import com.example.server.review.dto.ReviewResponse;
 
 @WebMvcTest(ReviewController.class)
@@ -106,6 +107,36 @@ class ReviewControllerTests {
                 .andExpect(jsonPath("$.message").value("订单商品 ID 不能为空"));
     }
 
+    @Test
+    void listProductReviewsReturnsFrontendFieldsOnly() throws Exception {
+        when(reviewService.listProductReviews(5L)).thenReturn(java.util.List.of(publicReviewResponse()));
+
+        mockMvc.perform(get("/api/products/5/reviews"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].username").value("review-user"))
+                .andExpect(jsonPath("$[0].rating").value(5))
+                .andExpect(jsonPath("$[0].content").value("商品很好"))
+                .andExpect(jsonPath("$[0].userId").doesNotExist())
+                .andExpect(jsonPath("$[0].orderItemId").doesNotExist())
+                .andExpect(jsonPath("$[0].orderNumber").doesNotExist());
+
+        verify(reviewService).listProductReviews(5L);
+    }
+
+    @Test
+    void listAdminReviewsUsesServiceResponse() throws Exception {
+        when(reviewService.listAdminReviews()).thenReturn(java.util.List.of(reviewResponse()));
+
+        mockMvc.perform(get("/api/admin/reviews"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].userId").value(7))
+                .andExpect(jsonPath("$[0].orderItemId").value(11))
+                .andExpect(jsonPath("$[0].orderNumber").value("ORDER-001"));
+
+        verify(reviewService).listAdminReviews();
+    }
+
     private ReviewResponse reviewResponse() {
         Instant now = Instant.parse("2026-04-16T08:00:00Z");
         return new ReviewResponse(
@@ -119,6 +150,16 @@ class ReviewControllerTests {
                 5,
                 "商品很好",
                 now,
+                now);
+    }
+
+    private PublicReviewResponse publicReviewResponse() {
+        Instant now = Instant.parse("2026-04-16T08:00:00Z");
+        return new PublicReviewResponse(
+                1L,
+                "review-user",
+                5,
+                "商品很好",
                 now);
     }
 }

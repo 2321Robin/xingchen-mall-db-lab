@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.server.review.dto.CreateReviewRequest;
+import com.example.server.review.dto.PublicReviewResponse;
 import com.example.server.review.dto.ReviewResponse;
 
 import jakarta.validation.Valid;
@@ -38,7 +39,7 @@ public class ReviewController {
     }
 
     @GetMapping("/api/products/{productId}/reviews")
-    public List<ReviewResponse> listProductReviews(@PathVariable Long productId) {
+    public List<PublicReviewResponse> listProductReviews(@PathVariable Long productId) {
         return reviewService.listProductReviews(productId);
     }
 

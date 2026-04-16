@@ -26,6 +26,7 @@ import com.example.server.product.Product;
 import com.example.server.product.ProductRepository;
 import com.example.server.product.ProductStatus;
 import com.example.server.review.dto.CreateReviewRequest;
+import com.example.server.review.dto.PublicReviewResponse;
 import com.example.server.review.dto.ReviewResponse;
 import com.example.server.user.UserAccount;
 import com.example.server.user.UserAccountRepository;
@@ -176,15 +177,15 @@ class ReviewServiceTests {
         entityManager.flush();
         entityManager.clear();
 
-        List<ReviewResponse> reviews = reviewService.listProductReviews(targetFirst.product().getId());
+        List<PublicReviewResponse> reviews = reviewService.listProductReviews(targetFirst.product().getId());
 
         assertThat(reviews).hasSize(2);
         assertThat(reviews)
-                .extracting(ReviewResponse::productId)
-                .containsOnly(targetFirst.product().getId());
-        assertThat(reviews)
-                .extracting(ReviewResponse::content)
+                .extracting(PublicReviewResponse::content)
                 .containsExactly("第二条评价", "第一条评价");
+        assertThat(reviews)
+                .extracting(PublicReviewResponse::username)
+                .containsExactly("review-product-user-2", "review-product-user-1");
     }
 
     private ReviewFixture createFixture(OrderStatus status, String orderNumber, String username) {

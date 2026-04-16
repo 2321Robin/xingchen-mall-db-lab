@@ -16,6 +16,7 @@ import com.example.server.order.OrderStatus;
 import com.example.server.product.Product;
 import com.example.server.product.ProductRepository;
 import com.example.server.review.dto.CreateReviewRequest;
+import com.example.server.review.dto.PublicReviewResponse;
 import com.example.server.review.dto.ReviewResponse;
 import com.example.server.user.UserAccount;
 import com.example.server.user.UserAccountRepository;
@@ -90,9 +91,9 @@ public class ReviewService {
         return toResponse(review);
     }
 
-    public List<ReviewResponse> listProductReviews(Long productId) {
+    public List<PublicReviewResponse> listProductReviews(Long productId) {
         return reviewRepository.findByProductIdOrderByCreatedAtDesc(productId).stream()
-                .map(this::toResponse)
+                .map(this::toPublicResponse)
                 .toList();
     }
 
@@ -129,5 +130,14 @@ public class ReviewService {
                 review.getContent(),
                 review.getCreatedAt(),
                 review.getUpdatedAt());
+    }
+
+    private PublicReviewResponse toPublicResponse(Review review) {
+        return new PublicReviewResponse(
+                review.getId(),
+                review.getUser().getUsername(),
+                review.getRating(),
+                review.getContent(),
+                review.getCreatedAt());
     }
 }
