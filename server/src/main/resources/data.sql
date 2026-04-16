@@ -81,6 +81,12 @@ VALUES
 ON CONFLICT (sku)
 DO NOTHING;
 
+UPDATE products
+SET price = 289.00,
+    updated_at = NOW()
+WHERE sku = 'SC-CUP-01'
+  AND price <> 289.00;
+
 INSERT INTO user_addresses (user_id, recipient_name, phone, province, city, district, street, postal_code, is_default, created_at, updated_at)
 SELECT ua.id, '张三', '13900000001', '广东省', '广州市', '天河区', '科韵路 99 号 星辰公寓 1 栋 502', '510000', TRUE, NOW(), NOW()
 FROM user_accounts ua
