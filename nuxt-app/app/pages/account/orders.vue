@@ -232,7 +232,9 @@ const payOrder = async (order: Order) => {
       method: 'POST'
     })
 
-    orders.value = orders.value.map(item => (item.id === updated.id ? updated : item))
+    const nextOrders = orders.value.map(item => (item.id === updated.id ? updated : item))
+    orders.value = nextOrders
+    await fetchReviewStatuses(nextOrders)
     showSuccess('支付成功，订单状态已更新为已付款')
   } catch (error) {
     showError(extractErrorMessage(error, '支付失败，请稍后重试'))
