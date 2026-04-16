@@ -43,16 +43,15 @@ public class ReviewService {
 
     @Transactional
     public ReviewResponse createReview(Long userId, CreateReviewRequest request) {
-        CustomerOrder order = customerOrderRepository.findByOrderItemId(request.orderItemId())
+        CustomerOrder order = customerOrderRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .filter(candidate -> candidate.getItems().stream()
+                        .anyMatch(item -> item.getId().equals(request.orderItemId())))
+                .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到订单商品"));
         OrderItem orderItem = order.getItems().stream()
                 .filter(item -> item.getId().equals(request.orderItemId()))
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到订单商品"));
-
-        if (!order.getUser().getId().equals(userId)) {
-            throw new ReviewException("只有购买者才能评价该商品");
-        }
         if (order.getStatus() != OrderStatus.PAID
                 && order.getStatus() != OrderStatus.SHIPPED
                 && order.getStatus() != OrderStatus.DELIVERED) {

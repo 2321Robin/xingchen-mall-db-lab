@@ -85,7 +85,7 @@ class ReviewServiceTests {
     }
 
     @Test
-    void createReviewRejectsWrongUser() {
+    void createReviewReturnsNotFoundForForeignOrderItem() {
         ReviewFixture fixture = createFixture(OrderStatus.SHIPPED, "REVIEW-USER-001", "review-right-user");
         UserAccount otherUser = createUser("review-other-user", "review-other-user@example.com", "13900000072");
         entityManager.flush();
@@ -94,8 +94,10 @@ class ReviewServiceTests {
                 fixture.orderItem().getId(),
                 3,
                 "不是购买者")))
-                .isInstanceOf(ReviewException.class)
-                .hasMessage("只有购买者才能评价该商品");
+                .isInstanceOfSatisfying(ResponseStatusException.class, exception -> {
+                    assertThat(exception.getStatusCode().value()).isEqualTo(404);
+                    assertThat(exception.getReason()).isEqualTo("未找到订单商品");
+                });
     }
 
     @Test
@@ -267,7 +269,7 @@ class ReviewServiceTests {
         when(order.getStatus()).thenReturn(OrderStatus.DELIVERED);
         when(order.getItems()).thenReturn(java.util.List.of(orderItem));
 
-        when(orderRepository.findByOrderItemId(orderItemId)).thenReturn(java.util.Optional.of(order));
+        when(orderRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(java.util.List.of(order));
         when(duplicateReviewRepository.existsByOrderItemId(orderItemId)).thenReturn(false);
         when(accountRepository.findById(userId)).thenReturn(java.util.Optional.of(user));
         when(productRepository.findById(productId)).thenReturn(java.util.Optional.of(product));
