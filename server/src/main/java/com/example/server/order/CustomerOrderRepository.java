@@ -30,5 +30,9 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     @Query("select o from CustomerOrder o where o.id = :id and o.user.id = :userId")
     Optional<CustomerOrder> findByIdAndUserIdForUpdate(@Param("id") Long id, @Param("userId") Long userId);
 
+    @EntityGraph(attributePaths = {"user", "items"})
+    @Query("select distinct o from CustomerOrder o join o.items i where i.id = :orderItemId")
+    Optional<CustomerOrder> findByOrderItemId(@Param("orderItemId") Long orderItemId);
+
     boolean existsByOrderNumber(String orderNumber);
 }
