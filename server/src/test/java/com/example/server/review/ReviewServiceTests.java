@@ -98,8 +98,8 @@ class ReviewServiceTests {
     }
 
     @Test
-    void createReviewRejectsNonReviewableOrderStatus() {
-        ReviewFixture fixture = createFixture(OrderStatus.PAID, "REVIEW-STATUS-001", "review-status-user");
+    void createReviewRejectsPendingPaymentOrderStatus() {
+        ReviewFixture fixture = createFixture(OrderStatus.PENDING_PAYMENT, "REVIEW-STATUS-001", "review-status-user");
 
         assertThatThrownBy(() -> reviewService.createReview(fixture.user().getId(), new CreateReviewRequest(
                 fixture.orderItem().getId(),
@@ -107,6 +107,78 @@ class ReviewServiceTests {
                 "还没发货")))
                 .isInstanceOf(ReviewException.class)
                 .hasMessage("当前订单状态不支持评价");
+    }
+
+    @Test
+    void updateReviewAllowsPurchaserToModifyOwnReview() {
+        ReviewFixture fixture = createFixture(OrderStatus.DELIVERED, "REVIEW-EDIT-001", "review-edit-user");
+        reviewService.createReview(fixture.user().getId(), new CreateReviewRequest(
+                fixture.orderItem().getId(),
+                4,
+                "初始评价"));
+
+        ReviewResponse response = reviewService.updateReview(
+                fixture.user().getId(),
+                fixture.orderItem().getId(),
+                new CreateReviewRequest(fixture.orderItem().getId(), 5, "修改后的评价"));
+
+        assertThat(response.rating()).isEqualTo(5);
+        assertThat(response.content()).isEqualTo("修改后的评价");
+        assertThat(reviewRepository.findByOrderItemId(fixture.orderItem().getId()))
+                .get()
+                .extracting(Review::getRating, Review::getContent)
+                .containsExactly(5, "修改后的评价");
+    }
+
+    @Test
+    void updateReviewRejectsWrongUser() {
+        ReviewFixture fixture = createFixture(OrderStatus.SHIPPED, "REVIEW-EDIT-002", "review-owner-user");
+        UserAccount otherUser = createUser("review-edit-other", "review-edit-other@example.com", "13900000111");
+        reviewService.createReview(fixture.user().getId(), new CreateReviewRequest(
+                fixture.orderItem().getId(),
+                4,
+                "原评价"));
+
+        assertThatThrownBy(() -> reviewService.updateReview(
+                otherUser.getId(),
+                fixture.orderItem().getId(),
+                new CreateReviewRequest(fixture.orderItem().getId(), 2, "越权修改")))
+                .isInstanceOf(ReviewException.class)
+                .hasMessage("只有购买者才能评价该商品");
+    }
+
+    @Test
+    void updateReviewRejectsPendingPaymentOrderStatus() {
+        ReviewFixture fixture = createFixture(OrderStatus.PENDING_PAYMENT, "REVIEW-EDIT-003", "review-edit-status-user");
+        Review existingReview = persistReview(fixture.user(), fixture.product(), fixture.orderItem(), 4, "原评价");
+
+        assertThatThrownBy(() -> reviewService.updateReview(
+                fixture.user().getId(),
+                fixture.orderItem().getId(),
+                new CreateReviewRequest(fixture.orderItem().getId(), 1, "不应允许修改")))
+                .isInstanceOf(ReviewException.class)
+                .hasMessage("当前订单状态不支持评价");
+
+        assertThat(reviewRepository.findById(existingReview.getId()))
+                .get()
+                .extracting(Review::getRating, Review::getContent)
+                .containsExactly(4, "原评价");
+    }
+
+    @Test
+    void getUserReviewByProductFindsReviewShortcutTarget() {
+        ReviewFixture fixture = createFixture(OrderStatus.PAID, "REVIEW-EDIT-004", "review-product-link-user");
+        reviewService.createReview(fixture.user().getId(), new CreateReviewRequest(
+                fixture.orderItem().getId(),
+                5,
+                "商品页入口测试"));
+
+        ReviewResponse response = reviewService.getUserReviewByProduct(
+                fixture.user().getId(),
+                fixture.product().getId());
+
+        assertThat(response.orderItemId()).isEqualTo(fixture.orderItem().getId());
+        assertThat(response.productId()).isEqualTo(fixture.product().getId());
     }
 
     @Test
@@ -250,6 +322,19 @@ class ReviewServiceTests {
         item.setUnitPrice(product.getPrice());
         order.getItems().add(item);
         return entityManager.persist(item);
+    }
+
+    private Review persistReview(UserAccount user, Product product, OrderItem orderItem, int rating, String content) {
+        Review review = new Review();
+        review.setUserId(user.getId());
+        review.setProductId(product.getId());
+        review.setOrderItemId(orderItem.getId());
+        review.setUser(user);
+        review.setProduct(product);
+        review.setOrderItem(orderItem);
+        review.setRating(rating);
+        review.setContent(content);
+        return entityManager.persistAndFlush(review);
     }
 
     private String nextPhone(String seed) {

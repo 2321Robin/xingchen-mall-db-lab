@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -71,6 +72,45 @@ class ReviewControllerTests {
                 .andExpect(jsonPath("$.orderItemId").value(11));
 
         verify(reviewService).getUserReviewByOrderItem(7L, 11L);
+    }
+
+    @Test
+    void updateReviewUsesUserIdAndOrderItemPathVariables() throws Exception {
+        when(reviewService.updateReview(eq(7L), eq(11L), argThat((CreateReviewRequest request) ->
+                request.orderItemId().equals(11L)
+                        && request.rating().equals(5)
+                        && request.content().equals("修改后的评价"))))
+                .thenReturn(reviewResponse());
+
+        mockMvc.perform(put("/api/user/reviews/7/order-item/11")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "orderItemId": 11,
+                                  "rating": 5,
+                                  "content": "修改后的评价"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(7))
+                .andExpect(jsonPath("$.orderItemId").value(11));
+
+        verify(reviewService).updateReview(eq(7L), eq(11L), argThat((CreateReviewRequest request) ->
+                request.orderItemId().equals(11L)
+                        && request.rating().equals(5)
+                        && request.content().equals("修改后的评价")));
+    }
+
+    @Test
+    void getUserReviewByProductUsesPathVariables() throws Exception {
+        when(reviewService.getUserReviewByProduct(7L, 5L)).thenReturn(reviewResponse());
+
+        mockMvc.perform(get("/api/user/reviews/7/products/5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(7))
+                .andExpect(jsonPath("$.productId").value(5));
+
+        verify(reviewService).getUserReviewByProduct(7L, 5L);
     }
 
     @Test

@@ -53,7 +53,9 @@ public class ReviewService {
         if (!order.getUser().getId().equals(userId)) {
             throw new ReviewException("只有购买者才能评价该商品");
         }
-        if (order.getStatus() != OrderStatus.SHIPPED && order.getStatus() != OrderStatus.DELIVERED) {
+        if (order.getStatus() != OrderStatus.PAID
+                && order.getStatus() != OrderStatus.SHIPPED
+                && order.getStatus() != OrderStatus.DELIVERED) {
             throw new ReviewException("当前订单状态不支持评价");
         }
         if (reviewRepository.existsByOrderItemId(orderItem.getId())) {
@@ -87,6 +89,32 @@ public class ReviewService {
 
     public ReviewResponse getUserReviewByOrderItem(Long userId, Long orderItemId) {
         Review review = reviewRepository.findByOrderItemIdAndUserId(orderItemId, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到评价"));
+        return toResponse(review);
+    }
+
+    @Transactional
+    public ReviewResponse updateReview(Long userId, Long orderItemId, CreateReviewRequest request) {
+        Review review = reviewRepository.findByOrderItemId(orderItemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到评价"));
+
+        CustomerOrder order = review.getOrderItem().getOrder();
+        if (!order.getUser().getId().equals(userId)) {
+            throw new ReviewException("只有购买者才能评价该商品");
+        }
+        if (order.getStatus() != OrderStatus.PAID
+                && order.getStatus() != OrderStatus.SHIPPED
+                && order.getStatus() != OrderStatus.DELIVERED) {
+            throw new ReviewException("当前订单状态不支持评价");
+        }
+
+        review.setRating(request.rating());
+        review.setContent(normalizeContent(request.content()));
+        return toResponse(reviewRepository.saveAndFlush(review));
+    }
+
+    public ReviewResponse getUserReviewByProduct(Long userId, Long productId) {
+        Review review = reviewRepository.findFirstByUserIdAndProductIdOrderByUpdatedAtDescCreatedAtDesc(userId, productId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "未找到评价"));
         return toResponse(review);
     }

@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -36,6 +37,19 @@ public class ReviewController {
     @GetMapping("/api/user/reviews/{userId}/order-item/{orderItemId}")
     public ReviewResponse getUserReviewByOrderItem(@PathVariable Long userId, @PathVariable Long orderItemId) {
         return reviewService.getUserReviewByOrderItem(userId, orderItemId);
+    }
+
+    @PutMapping("/api/user/reviews/{userId}/order-item/{orderItemId}")
+    public ReviewResponse updateReview(
+            @PathVariable Long userId,
+            @PathVariable Long orderItemId,
+            @Valid @RequestBody CreateReviewRequest request) {
+        return reviewService.updateReview(userId, orderItemId, request);
+    }
+
+    @GetMapping("/api/user/reviews/{userId}/products/{productId}")
+    public ReviewResponse getUserReviewByProduct(@PathVariable Long userId, @PathVariable Long productId) {
+        return reviewService.getUserReviewByProduct(userId, productId);
     }
 
     @GetMapping("/api/products/{productId}/reviews")
