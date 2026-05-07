@@ -26,9 +26,9 @@
 
 详细模块说明请分别查看：
 
-- `nuxt-app/README.md`：前端结构、运行方式、问题记录
-- `server/README.md`：后端模块说明、运行方式、问题记录
-- `nuxt-app/report.md`：数据库实验报告正文
+- `nuxt-app/README.md`：前端结构与运行方式说明
+- `server/README.md`：后端模块与运行方式说明
+- `report.md`：数据库实验报告正文
 
 ## 遇到的问题与解决方案（概览）
 
@@ -40,7 +40,11 @@
 
 ## 本地运行摘要
 
-```bash
+请先确保本机已安装 Java/JDK、Node.js，并且 `pnpm` 可用（或已启用 `corepack`）。
+
+手动运行方式：
+
+```powershell
 # 前端
 cd nuxt-app
 pnpm install
@@ -48,10 +52,9 @@ pnpm dev
 
 # 后端
 cd server
-./gradlew clean build
-./gradlew bootRun
+./gradlew.bat bootRun --args="--server.port=8081"
 ```
 
-默认前端运行在 `http://localhost:3000`，后端运行在 `http://localhost:8080`。前端通过 `NUXT_PUBLIC_API_BASE` 配置后端地址。
+默认前端运行在 `http://localhost:3000`，后端运行在 `http://localhost:8081`。前端通过 `NUXT_PUBLIC_API_BASE` 配置后端地址。
 
 至此，商城业务功能和数据库实验补强均已完成，后续如需扩展（例如真实支付、物流跟踪等）可在现有模块基础上迭代。
