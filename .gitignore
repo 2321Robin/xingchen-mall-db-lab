@@ -1,7 +1,16 @@
 .worktrees/
+docs/
 server/.git/
 nuxt-app/.git/
 server/.idea/
 nuxt-app/.nuxt/
 nuxt-app/.output/
 *.zip
+
+# Report and submission artifacts
+report.*
+*.doc
+*.docx
+*报告*
+*课内实验*
+ER图.png
